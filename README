@@ -1,0 +1,67 @@
+NAME
+    Mojolicious::Plugin::CGI - Run CGI script from Mojolicious
+
+VERSION
+    0.01
+
+DESCRIPTION
+    This plugin enable the Mojolicious application to run Perl CGI scripts.
+
+NOTICE
+    Running CGI scripts does not mix well with non-blocking requests, since
+    the script will be executed inside the request as a blocking code ref.
+
+    TODO: Make it non-blocking.
+
+SYNOPSIS
+      use Mojolicious::Lite;
+
+      plugin CGI => [ '/script' => '/path/to/cgi/script.pl' ];
+      plugin CGI => {
+        route => '/mount/point',
+        script => '/path/to/cgi/script.pl',
+        env => {}, # default is \%ENV
+      };
+
+      app->start;
+
+METHODS
+  env
+    Returns a hash ref containing the environment variables that should be
+    used when starting the CGI script. Defaults to %ENV when this module was
+    loaded.
+
+  emulate_environment
+      %env = $self->emulate_environment($c);
+
+    Returns a hash which contains the environment variables which should be
+    used by the CGI script.
+
+    In addition to "env", these dynamic variables are set:
+
+      CONTENT_LENGTH, CONTENT_TYPE, HTTP_COOKIE, HTTP_HOST, HTTP_REFERER,
+      HTTP_USER_AGENT, HTTPS, PATH, PATH_INFO, QUERY_STRING, REMOTE_ADDR,
+      REMOTE_HOST, REMOTE_PORT, REMOTE_USER, REQUEST_METHOD, SCRIPT_NAME,
+      SERVER_PORT, SERVER_PROTOCOL.
+
+    Additional static variables:
+
+      GATEWAY_INTERFACE = "CGI/1.1"
+      SERVER_ADMIN = $ENV{USER}
+      SCRIPT_FILENAME = Script name given as argument to register.
+      SERVER_NAME = Sys::Hostname::hostname()
+      SERVER_SOFTWARE = "Mojolicious::Plugin::CGI"
+
+  register
+      $self->register($app, [ $route => $script ]);
+      $self->register($app, %args);
+      $self->register($app, \%args);
+
+    "route" and path need to exist as keys in %args unless given as plain
+    arguments.
+
+    $route can be either a plain path or a route object.
+
+AUTHOR
+    Jan Henning Thorsen - "jhthorsen@cpan.org"
+
