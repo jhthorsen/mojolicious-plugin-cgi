@@ -228,7 +228,7 @@ sub PRINT {
   }
   else {
     $self->{buf} .= $_[0];
-    $self->{buf} =~ s/^(.*?\x0a\x0d\x0a\x0d)//s or return 1;
+    $self->{buf} =~ s/^(.*?\x0a\x0d?\x0a\x0d?)//s or return 1;
     $self->{headers} = $1;
 
     if($self->{headers} =~ /^HTTP/) {
