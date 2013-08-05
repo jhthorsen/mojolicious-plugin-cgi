@@ -6,7 +6,7 @@ Mojolicious::Plugin::CGI - Run CGI script from Mojolicious
 
 =head1 VERSION
 
-0.01
+0.02
 
 =head1 DESCRIPTION
 
@@ -43,7 +43,7 @@ use SelectSaver;
 use Sys::Hostname;
 use Socket;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 our %ORIGINAL_ENV = %ENV;
 
 =head1 METHODS
@@ -88,6 +88,9 @@ sub emulate_environment {
   my $req = $tx->req;
   my $headers = $req->headers;
   my $base_path = $req->url->base->path;
+  my $script_name = $req->url->path;
+
+  $script_name =~ s!^/?\Q$base_path\E/?!!;
 
   return(
     %{ $self->env },
@@ -108,7 +111,7 @@ sub emulate_environment {
     REMOTE_USER => $c->session('username') || '', # TODO: Should probably be configurable
     REQUEST_METHOD => $req->method,
     SCRIPT_FILENAME => $self->{script},
-    SCRIPT_NAME => $req->url->path =~ s!^/?\Q$base_path\E/?!!r,
+    SCRIPT_NAME => $script_name,
     SERVER_ADMIN => $ENV{USER} || '',
     SERVER_NAME => hostname,
     SERVER_PORT => $tx->local_port,

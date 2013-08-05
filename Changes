@@ -1,4 +1,7 @@
 Revision history for Mojolicious-Plugin-CGI
 
+0.02     Mon Aug  5 12:45:43 2013
+       * Fix compat with older perls.
+
 0.01     Thu Jul 11 11:40:26 2013
        * Add basic support for calling CGI scripts
