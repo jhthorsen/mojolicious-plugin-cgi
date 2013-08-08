@@ -3,6 +3,8 @@ use strict;
 use Test::More;
 use Test::Mojo;
 
+plan skip_all => 't/cgi-bin/working.pl' unless -x 't/cgi-bin/working.pl';
+
 {
   use Mojolicious::Lite;
   plugin CGI => [ '/working' => 't/cgi-bin/working.pl' ];
@@ -27,7 +29,6 @@ $t->get_ok('/env/basic?query=123')
   ->content_like(qr{^HTTP_HOST=localhost:\d+}m, 'HTTP_HOST=localhost:\d+')
   ->content_like(qr{^HTTP_REFERER=}m, 'HTTP_REFERER=')
   ->content_like(qr{^HTTP_USER_AGENT=Mojolicious \(Perl\)}m, 'HTTP_USER_AGENT=Mojolicious \(Perl\)')
-  ->content_like(qr{^PATH=/env/basic}m, 'PATH=/env/basic')
   ->content_like(qr{^PATH_INFO=/env/basic}m, 'PATH_INFO=/env/basic')
   ->content_like(qr{^QUERY_STRING=query=123}m, 'QUERY_STRING=query=123')
   ->content_like(qr{^REMOTE_ADDR=\d+\S+}m, 'REMOTE_ADDR=\d+\S+')

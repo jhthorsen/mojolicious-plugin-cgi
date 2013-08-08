@@ -5,8 +5,6 @@ WriteMakefile(
   AUTHOR => 'Jan Henning Thorsen <jhthorsen@cpan.org>',
   PREREQ_PM => {
     'Mojolicious' => '4.00',
-    'CGI::Compile' => 0.01,
-    'SelectSaver' => 0.01,
   },
   test => {
     TESTS => 't/*.t',

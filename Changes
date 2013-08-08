@@ -1,5 +1,8 @@
 Revision history for Mojolicious-Plugin-CGI
 
+0.03     Thu Aug  8 12:23:36 2013
+       * CGI script is now non-blocking
+
 0.02     Mon Aug  5 12:45:43 2013
        * Fix compat with older perls.
 

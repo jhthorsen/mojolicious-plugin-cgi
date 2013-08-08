@@ -2,16 +2,12 @@ NAME
     Mojolicious::Plugin::CGI - Run CGI script from Mojolicious
 
 VERSION
-    0.02
+    0.03
 
 DESCRIPTION
-    This plugin enable the Mojolicious application to run Perl CGI scripts.
-
-NOTICE
-    Running CGI scripts does not mix well with non-blocking requests, since
-    the script will be executed inside the request as a blocking code ref.
-
-    TODO: Make it non-blocking.
+    This plugin enable Mojolicious to run Perl CGI scripts. It does so by
+    forking a new process with a modified environment and reads the STDOUT
+    in a non-blocking matter.
 
 SYNOPSIS
       use Mojolicious::Lite;

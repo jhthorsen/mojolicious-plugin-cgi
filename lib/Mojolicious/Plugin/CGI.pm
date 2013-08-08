@@ -6,18 +6,13 @@ Mojolicious::Plugin::CGI - Run CGI script from Mojolicious
 
 =head1 VERSION
 
-0.02
+0.03
 
 =head1 DESCRIPTION
 
-This plugin enable the L<Mojolicious> application to run Perl CGI scripts.
-
-=head1 NOTICE
-
-Running CGI scripts does not mix well with non-blocking requests, since the
-script will be executed inside the request as a blocking code ref.
-
-TODO: Make it non-blocking.
+This plugin enable L<Mojolicious> to run Perl CGI scripts. It does so by forking
+a new process with a modified environment and reads the STDOUT in a non-blocking
+matter.
 
 =head1 SYNOPSIS
 
@@ -35,15 +30,14 @@ TODO: Make it non-blocking.
 =cut
 
 use Mojo::Base 'Mojolicious::Plugin';
-use CGI::Compile;
 use File::Basename;
 use File::Spec;
 use POSIX qw/ :sys_wait_h /;
-use SelectSaver;
 use Sys::Hostname;
 use Socket;
+use constant CHUNK_SIZE => 131072;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 our %ORIGINAL_ENV = %ENV;
 
 =head1 METHODS
@@ -102,7 +96,7 @@ sub emulate_environment {
     HTTP_REFERER => $headers->referrer || '',
     HTTP_USER_AGENT => $headers->user_agent || '',
     HTTPS => $req->is_secure ? 'YES' : 'NO',
-    PATH => $req->url->path,
+    #PATH => $req->url->path,
     PATH_INFO => $req->url->path,
     QUERY_STRING => $req->url->query->to_string,
     REMOTE_ADDR => $tx->remote_address,
@@ -150,30 +144,77 @@ sub register {
   $self->{script} = File::Spec->rel2abs($self->{script});
   -r $self->{script} or die "Cannot read $self->{script}";
   $self->{name} = basename $self->{script};
-  $cb = CGI::Compile->compile($self->{script});
-
   $self->{route} = $app->routes->any($self->{route}) unless ref $self->{route};
   $self->{route}->to(cb => sub {
-    my $c = shift;
+    my $c = shift->render_later;
+    my $reactor = Mojo::IOLoop->singleton->reactor;
+    my $stdin = $c->req->content->asset;
+    my($pid, $stdout_read, $stdout_write);
 
     $log->debug("Running $self->{script} ...");
 
-    {
-      my $saver = SelectSaver->new('::STDOUT');
-      local *STDERR; tie *STDERR, 'Mojolicious::Plugin::CGI::STDERR', $log, $self->{name} if $got_log_file;
-      local *STDIN; tie *STDIN, 'Mojolicious::Plugin::CGI::STDIN', $c->req->body;
-      local *STDOUT; tie *STDOUT, 'Mojolicious::Plugin::CGI::STDOUT', $c->res;
-      local %ENV = $self->emulate_environment($c);
-      $cb->();
+    unless(pipe $stdout_read, $stdout_write) {
+      return $c->render_exception("pipe: $!");
+    }
+    unless($c->req->content->isa('Mojo::Content::Single')) {
+      return $c->render_exception('Can only handle Mojo::Content::Single requests');
+    }
+    unless($stdin->isa('Mojo::Asset::File')) {
+      $stdin = Mojo::Asset::File->new->add_chunk($stdin->slurp);
     }
 
-    if(my $e = $c->res->error) {
-      $c->render_exception("[$self->{name}] $e");
+    $reactor->io($stdout_read, $self->_stdout_callback($c, $stdout_read));
+    $reactor->watch($stdout_read, 1, 0);
+
+    unless(defined($pid = fork)) {
+      return $c->render_exception("fork: $!");
+    }
+    unless($pid) {
+      %ENV = $self->emulate_environment($c);
+      close $stdout_read;
+      open STDIN, '<', $stdin->path or die $!;
+      open STDOUT, '>&' . fileno $stdout_write or die $!;
+      select STDOUT;
+      $| = 1;
+      exec $self->{script};
+    }
+
+    $c->stash('cgi.pid' => $pid, 'cgi.stdin' => $stdin);
+  });
+}
+
+sub _stdout_callback {
+  my($self, $c, $stdout_read) = @_;
+  my $buf = '';
+  my $headers;
+
+  return sub {
+    my $read = $stdout_read->sysread(my $b, CHUNK_SIZE, 0);
+
+    if(!$read) {
+      Mojo::IOLoop->singleton->reactor->watch($stdout_read, 0, 0);
+      unlink $c->stash('cgi.stdin')->path;
+      kill 0,  $c->stash('cgi.pid') and $c->app->log->warn("CGI script is still alive");
+      return $c->finish;
+    }
+    if($headers) {
+      return $c->write($b);
+    }
+
+    $buf .= $b;
+    $buf =~ s/^(.*?\x0a\x0d?\x0a\x0d?)//s or return;
+    $headers = $1;
+
+    if($headers =~ /^HTTP/) {
+      $c->res->parse($headers);
     }
     else {
-      $c->finish;
+      $c->res->code(200);
+      $c->res->parse($c->res->get_start_line_chunk(0) .$headers);
     }
-  });
+
+    $c->write($buf) if length $buf;
+  }
 }
 
 =head1 AUTHOR
@@ -181,71 +222,5 @@ sub register {
 Jan Henning Thorsen - C<jhthorsen@cpan.org>
 
 =cut
-
-#=============================================================================
-package # hide from CPAN
-  Mojolicious::Plugin::CGI::STDERR;
-
-sub TIEHANDLE { bless { log => $_[1], key => $_[2] }, $_[0] }
-sub PRINT { $_[0]->{log}->error("[$_[0]->{key}] $_[1]") }
-sub PRINTF { PRINT(shift, sprintf shift, @_) }
-
-#=============================================================================
-package # hide from CPAN
-  Mojolicious::Plugin::CGI::STDIN;
-
-sub TIEHANDLE { bless { body => $_[1], pos => 0 }, $_[0] }
-sub READ {
-  my($self, undef, $len, $offset) = @_;
-  return 0 if $offset > length $self->{body};
-  $offset ||= 0;
-  $_[1] = substr $self->{body}, $offset, $len;
-  $self->{pos} = $offset ? $offset + $len : $self->{pos} + $len;
-  length $_[1];
-}
-sub READLINE {
-  my $self = shift;
-  my($pos, $buf);
-
-  return if $self->{pos} == length $self->{body};
-  pos($self->{body}) = $self->{pos};
-  $self->{body} =~ /\n/;
-  $pos = pos $self->{body} // length $self->{body};
-  $buf = substr $self->{body}, $self->{pos}, $pos;
-  $self->{pos} = $pos;
-  $buf;
-}
-
-#=============================================================================
-package # hide from CPAN
-  Mojolicious::Plugin::CGI::STDOUT;
-
-sub TIEHANDLE { bless { res => $_[1], buf => '' }, $_[0] }
-sub PRINTF { PRINT(shift, sprintf shift, @_) }
-sub PRINT {
-  my $self = shift;
-  my $res = $self->{res};
-
-  if($self->{headers}) {
-    $res->content->write($_[0]);
-  }
-  else {
-    $self->{buf} .= $_[0];
-    $self->{buf} =~ s/^(.*?\x0a\x0d?\x0a\x0d?)//s or return 1;
-    $self->{headers} = $1;
-
-    if($self->{headers} =~ /^HTTP/) {
-      $res->parse($self->{headers});
-    }
-    else {
-      $res->code(200);
-      $res->parse($res->get_start_line_chunk(0) .$self->{headers});
-    }
-
-    $res->content->write($self->{buf});
-  }
-
-  return 1;
-}
 
 1;
