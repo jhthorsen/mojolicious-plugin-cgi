@@ -1,5 +1,8 @@
 Revision history for Mojolicious-Plugin-CGI
 
+0.0301   Thu Aug  8 12:31:28 2013
+       * Need to waitpid to avoid defunct processes
+
 0.03     Thu Aug  8 12:23:36 2013
        * CGI script is now non-blocking
 

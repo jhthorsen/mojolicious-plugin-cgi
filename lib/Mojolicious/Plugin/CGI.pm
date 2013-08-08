@@ -6,7 +6,7 @@ Mojolicious::Plugin::CGI - Run CGI script from Mojolicious
 
 =head1 VERSION
 
-0.03
+0.0301
 
 =head1 DESCRIPTION
 
@@ -37,7 +37,7 @@ use Sys::Hostname;
 use Socket;
 use constant CHUNK_SIZE => 131072;
 
-our $VERSION = '0.03';
+our $VERSION = '0.0301';
 our %ORIGINAL_ENV = %ENV;
 
 =head1 METHODS
@@ -194,7 +194,7 @@ sub _stdout_callback {
     if(!$read) {
       Mojo::IOLoop->singleton->reactor->watch($stdout_read, 0, 0);
       unlink $c->stash('cgi.stdin')->path;
-      kill 0,  $c->stash('cgi.pid') and $c->app->log->warn("CGI script is still alive");
+      waitpid $c->stash('cgi.pid'), 0;
       return $c->finish;
     }
     if($headers) {
