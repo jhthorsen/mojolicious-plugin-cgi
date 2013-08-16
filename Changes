@@ -1,5 +1,8 @@
 Revision history for Mojolicious-Plugin-CGI
 
+0.0401   Fri Aug 16 23:24:58 2013
+       * Fix NAME in Makefile.PL
+
 0.04     Fri Aug 16 09:15:16 2013
        * Add before hook which can modify query string
 

@@ -6,7 +6,7 @@ Mojolicious::Plugin::CGI - Run CGI script from Mojolicious
 
 =head1 VERSION
 
-0.04
+0.0401
 
 =head1 DESCRIPTION
 
@@ -42,7 +42,7 @@ use Sys::Hostname;
 use Socket;
 use constant CHUNK_SIZE => 131072;
 
-our $VERSION = '0.04';
+our $VERSION = '0.0401';
 our %ORIGINAL_ENV = %ENV;
 
 =head1 METHODS
