@@ -6,7 +6,7 @@ Mojolicious::Plugin::CGI - Run CGI script from Mojolicious
 
 =head1 VERSION
 
-0.0301
+0.04
 
 =head1 DESCRIPTION
 
@@ -23,6 +23,11 @@ matter.
     route => '/mount/point',
     script => '/path/to/cgi/script.pl',
     env => {}, # default is \%ENV
+    before => sub { # called before setup and script start
+      my $c = shift;
+      # modify QUERY_STRING
+      $c->req->url->query->param(a => 123);
+    },
   };
 
   app->start;
@@ -37,7 +42,7 @@ use Sys::Hostname;
 use Socket;
 use constant CHUNK_SIZE => 131072;
 
-our $VERSION = '0.0301';
+our $VERSION = '0.04';
 our %ORIGINAL_ENV = %ENV;
 
 =head1 METHODS
@@ -131,7 +136,7 @@ sub register {
   my($self, $app, $args) = @_;
   my $log = $app->log;
   my $got_log_file = $log->path ? 1 : 0;
-  my $cb;
+  my($cb, $before);
 
   if(ref $args eq 'ARRAY') {
     $self->{route} = shift @$args;
@@ -140,6 +145,8 @@ sub register {
   else {
     $self->{$_} ||= $args->{$_} for keys %$args;
   }
+
+  $before = $self->{before} || sub {};
 
   $self->{script} = File::Spec->rel2abs($self->{script});
   -r $self->{script} or die "Cannot read $self->{script}";
@@ -165,6 +172,7 @@ sub register {
 
     $reactor->io($stdout_read, $self->_stdout_callback($c, $stdout_read));
     $reactor->watch($stdout_read, 1, 0);
+    $c->$before;
 
     unless(defined($pid = fork)) {
       return $c->render_exception("fork: $!");
@@ -222,5 +230,7 @@ sub _stdout_callback {
 Jan Henning Thorsen - C<jhthorsen@cpan.org>
 
 =cut
+
+1;
 
 1;

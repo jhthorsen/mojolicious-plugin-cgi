@@ -1,5 +1,8 @@
 Revision history for Mojolicious-Plugin-CGI
 
+0.04     Fri Aug 16 09:15:16 2013
+       * Add before hook which can modify query string
+
 0.0301   Thu Aug  8 12:31:28 2013
        * Need to waitpid to avoid defunct processes
 

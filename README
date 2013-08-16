@@ -2,7 +2,7 @@ NAME
     Mojolicious::Plugin::CGI - Run CGI script from Mojolicious
 
 VERSION
-    0.0301
+    0.04
 
 DESCRIPTION
     This plugin enable Mojolicious to run Perl CGI scripts. It does so by
@@ -17,6 +17,11 @@ SYNOPSIS
         route => '/mount/point',
         script => '/path/to/cgi/script.pl',
         env => {}, # default is \%ENV
+        before => sub { # called before setup and script start
+          my $c = shift;
+          # modify QUERY_STRING
+          $c->req->url->query->param(a => 123);
+        },
       };
 
       app->start;
