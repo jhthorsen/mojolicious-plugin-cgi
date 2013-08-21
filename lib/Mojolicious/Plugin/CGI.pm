@@ -156,6 +156,7 @@ sub register {
     my $c = shift->render_later;
     my $reactor = Mojo::IOLoop->singleton->reactor;
     my $stdin = $c->req->content->asset;
+    my $delay = Mojo::IOLoop->delay;
     my($pid, $stdout_read, $stdout_write);
 
     $log->debug("Running $self->{script} ...");
@@ -180,14 +181,16 @@ sub register {
     unless($pid) {
       %ENV = $self->emulate_environment($c);
       close $stdout_read;
-      open STDIN, '<', $stdin->path or die $!;
+      open STDIN, '<', $stdin->path or die "Could not open @{[$stdin->file]}: $!";
       open STDOUT, '>&' . fileno $stdout_write or die $!;
       select STDOUT;
       $| = 1;
-      exec $self->{script};
+      { exec $self->{script} }
+      die "Coudl not execute $self->{script}: $!";
     }
 
-    $c->stash('cgi.pid' => $pid, 'cgi.stdin' => $stdin);
+    $c->stash('cgi.pid' => $pid, 'cgi.stdin' => $stdin, 'cgi.cb' => $delay->begin);
+    $delay->wait unless Mojo::IOLoop->is_running;
   });
 }
 
@@ -203,6 +206,7 @@ sub _stdout_callback {
       Mojo::IOLoop->singleton->reactor->watch($stdout_read, 0, 0);
       unlink $c->stash('cgi.stdin')->path;
       waitpid $c->stash('cgi.pid'), 0;
+      $c->stash('cgi.cb')->();
       return $c->finish;
     }
     if($headers) {
