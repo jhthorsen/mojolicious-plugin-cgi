@@ -1,6 +1,8 @@
 Revision history for Mojolicious-Plugin-CGI
 
 0.05
+       * Fix pipe leak
+       * Support 302 redirects
        * Add better error handling
        * Will check if child is running
 

@@ -196,6 +196,7 @@ sub register {
       waitpid $pid, 0;
       $reader->();
       $reactor->watch($stdout_read, 0, 0);
+      $reactor->remove($stdout_read);
       $reactor->remove($tid);
       unlink $c->stash('cgi.stdin')->path;
       $c->stash('cgi.cb')->();
@@ -227,7 +228,7 @@ sub _stdout_callback {
       $c->res->parse($headers);
     }
     else {
-      $c->res->code(200);
+      $c->res->code($headers =~ /Location:/ ? 302 : 200);
       $c->res->parse($c->res->get_start_line_chunk(0) .$headers);
     }
 
