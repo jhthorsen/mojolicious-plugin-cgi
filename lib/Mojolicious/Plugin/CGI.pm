@@ -203,7 +203,8 @@ sub _stdout_callback {
     my $read = $stdout_read->sysread(my $b, CHUNK_SIZE, 0);
 
     if(!$read) {
-      Mojo::IOLoop->singleton->reactor->watch($stdout_read, 0, 0);
+      Mojo::IOLoop->singleton->reactor->remove($stdout_read);
+      $c->stash('cgi.stdin')->handle->close;
       unlink $c->stash('cgi.stdin')->path;
       waitpid $c->stash('cgi.pid'), 0;
       $c->stash('cgi.cb')->();
@@ -221,7 +222,7 @@ sub _stdout_callback {
       $c->res->parse($headers);
     }
     else {
-      $c->res->code(200);
+      $c->res->code($headers =~ /Location:/ ? 302 : 200);
       $c->res->parse($c->res->get_start_line_chunk(0) .$headers);
     }
 
