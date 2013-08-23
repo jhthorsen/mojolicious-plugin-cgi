@@ -6,7 +6,7 @@ Mojolicious::Plugin::CGI - Run CGI script from Mojolicious
 
 =head1 VERSION
 
-0.0401
+0.05
 
 =head1 DESCRIPTION
 
@@ -42,7 +42,7 @@ use Socket;
 use constant CHUNK_SIZE => 131072;
 use constant CHECK_CHILD_INTERVAL => $ENV{CHECK_CHILD_INTERVAL} || 0.01;
 
-our $VERSION = '0.0401';
+our $VERSION = '0.05';
 our %ORIGINAL_ENV = %ENV;
 
 =head1 METHODS
@@ -241,6 +241,8 @@ sub _stdout_callback {
 Jan Henning Thorsen - C<jhthorsen@cpan.org>
 
 =cut
+
+1;
 
 1;
 
