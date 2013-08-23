@@ -37,10 +37,10 @@ matter.
 use Mojo::Base 'Mojolicious::Plugin';
 use File::Basename;
 use File::Spec;
-use POSIX qw/ :sys_wait_h /;
 use Sys::Hostname;
 use Socket;
 use constant CHUNK_SIZE => 131072;
+use constant CHECK_CHILD_INTERVAL => $ENV{CHECK_CHILD_INTERVAL} || 0.01;
 
 our $VERSION = '0.0401';
 our %ORIGINAL_ENV = %ENV;
@@ -105,7 +105,7 @@ sub emulate_environment {
     PATH_INFO => $req->url->path,
     QUERY_STRING => $req->url->query->to_string,
     REMOTE_ADDR => $tx->remote_address,
-    REMOTE_HOST => gethostbyaddr(inet_aton($tx->remote_address), AF_INET) || '',
+    REMOTE_HOST => gethostbyaddr(inet_aton($tx->remote_address || '127.0.0.1'), AF_INET) || '',
     REMOTE_PORT => $tx->remote_port,
     REMOTE_USER => $c->session('username') || '', # TODO: Should probably be configurable
     REQUEST_METHOD => $req->method,
@@ -154,10 +154,11 @@ sub register {
   $self->{route} = $app->routes->any($self->{route}) unless ref $self->{route};
   $self->{route}->to(cb => sub {
     my $c = shift->render_later;
-    my $reactor = Mojo::IOLoop->singleton->reactor;
+    my $ioloop = Mojo::IOLoop->singleton;
+    my $reactor = $ioloop->reactor;
     my $stdin = $c->req->content->asset;
-    my $delay = Mojo::IOLoop->delay;
-    my($pid, $stdout_read, $stdout_write);
+    my $delay = $ioloop->delay;
+    my($pid, $tid, $reader, $stdout_read, $stdout_write);
 
     $log->debug("Running $self->{script} ...");
 
@@ -171,7 +172,8 @@ sub register {
       $stdin = Mojo::Asset::File->new->add_chunk($stdin->slurp);
     }
 
-    $reactor->io($stdout_read, $self->_stdout_callback($c, $stdout_read));
+    $reader = $self->_stdout_callback($c, $stdout_read);
+    $reactor->io($stdout_read, $reader);
     $reactor->watch($stdout_read, 1, 0);
     $c->$before;
 
@@ -181,7 +183,7 @@ sub register {
     unless($pid) {
       %ENV = $self->emulate_environment($c);
       close $stdout_read;
-      open STDIN, '<', $stdin->path or die "Could not open @{[$stdin->file]}: $!";
+      open STDIN, '<', $stdin->path or die "Could not open @{[$stdin->path]}: $!" if -s $stdin->path;
       open STDOUT, '>&' . fileno $stdout_write or die $!;
       select STDOUT;
       $| = 1;
@@ -189,8 +191,19 @@ sub register {
       die "Coudl not execute $self->{script}: $!";
     }
 
+    $tid = $ioloop->recurring(CHECK_CHILD_INTERVAL, sub {
+      kill 0, $pid and return;
+      waitpid $pid, 0;
+      $reader->();
+      $reactor->watch($stdout_read, 0, 0);
+      $reactor->remove($tid);
+      unlink $c->stash('cgi.stdin')->path;
+      $c->stash('cgi.cb')->();
+      $c->finish;
+    });
+
     $c->stash('cgi.pid' => $pid, 'cgi.stdin' => $stdin, 'cgi.cb' => $delay->begin);
-    $delay->wait unless Mojo::IOLoop->is_running;
+    $delay->wait unless $ioloop->is_running;
   });
 }
 
@@ -200,15 +213,8 @@ sub _stdout_callback {
   my $headers;
 
   return sub {
-    my $read = $stdout_read->sysread(my $b, CHUNK_SIZE, 0);
+    my $read = $stdout_read->sysread(my $b, CHUNK_SIZE, 0) or return;
 
-    if(!$read) {
-      Mojo::IOLoop->singleton->reactor->watch($stdout_read, 0, 0);
-      unlink $c->stash('cgi.stdin')->path;
-      waitpid $c->stash('cgi.pid'), 0;
-      $c->stash('cgi.cb')->();
-      return $c->finish;
-    }
     if($headers) {
       return $c->write($b);
     }
