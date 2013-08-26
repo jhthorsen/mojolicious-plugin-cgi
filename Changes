@@ -1,5 +1,8 @@
 Revision history for Mojolicious-Plugin-CGI
 
+0.0501   Mon Aug 26 18:35:24 2013
+       * Fix waitpid before kill, because of defunc children
+
 0.05     Fri Aug 23 16:31:13 2013
        * Fix pipe leak
        * Support 302 redirects

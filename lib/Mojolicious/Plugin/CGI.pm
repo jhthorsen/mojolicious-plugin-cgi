@@ -6,7 +6,7 @@ Mojolicious::Plugin::CGI - Run CGI script from Mojolicious
 
 =head1 VERSION
 
-0.05
+0.0501
 
 =head1 DESCRIPTION
 
@@ -38,11 +38,13 @@ use Mojo::Base 'Mojolicious::Plugin';
 use File::Basename;
 use File::Spec;
 use Sys::Hostname;
+use POSIX ':sys_wait_h';
 use Socket;
 use constant CHUNK_SIZE => 131072;
 use constant CHECK_CHILD_INTERVAL => $ENV{CHECK_CHILD_INTERVAL} || 0.01;
+use constant DEBUG => $ENV{MOJO_PLUGIN_CGI_DEBUG} || 0;
 
-our $VERSION = '0.05';
+our $VERSION = '0.0501';
 our %ORIGINAL_ENV = %ENV;
 
 =head1 METHODS
@@ -169,6 +171,7 @@ sub register {
       return $c->render_exception('Can only handle Mojo::Content::Single requests');
     }
     unless($stdin->isa('Mojo::Asset::File')) {
+      warn "Converting $stdin to Mojo::Asset::File\n" if DEBUG;
       $stdin = Mojo::Asset::File->new->add_chunk($stdin->slurp);
     }
 
@@ -181,6 +184,7 @@ sub register {
       return $c->render_exception("fork: $!");
     }
     unless($pid) {
+      warn "[$$] Starting child process\n" if DEBUG;
       %ENV = $self->emulate_environment($c);
       close $stdout_read;
       open STDIN, '<', $stdin->path or die "Could not open @{[$stdin->path]}: $!" if -s $stdin->path;
@@ -188,18 +192,20 @@ sub register {
       select STDOUT;
       $| = 1;
       { exec $self->{script} }
-      die "Coudl not execute $self->{script}: $!";
+      die "Could not execute $self->{script}: $!";
     }
 
+    warn "[$pid] Resuming parent process\n" if DEBUG;
     $tid = $ioloop->recurring(CHECK_CHILD_INTERVAL, sub {
-      kill 0, $pid and return;
-      waitpid $pid, 0;
+      waitpid $pid, WNOHANG or return;
+      warn "[$pid] Child ended\n" if DEBUG;
       $reader->();
       $reactor->watch($stdout_read, 0, 0);
       $reactor->remove($stdout_read);
       $reactor->remove($tid);
       unlink $c->stash('cgi.stdin')->path;
       $c->stash('cgi.cb')->();
+      warn "[$pid] Finishing up\n" if DEBUG;
       $c->finish;
     });
 
@@ -215,6 +221,7 @@ sub _stdout_callback {
 
   return sub {
     my $read = $stdout_read->sysread(my $b, CHUNK_SIZE, 0) or return;
+    warn "[@{[$c->{stash}{'cgi.pid'}]}] ($!) <<< ($b)\n" if DEBUG;
 
     if($headers) {
       return $c->write($b);
