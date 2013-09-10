@@ -207,7 +207,7 @@ sub register {
       $reactor->watch($stdout_read, 0, 0);
       $reactor->remove($stdout_read);
       $reactor->remove($tid);
-#      unlink $c->stash('cgi.stdin')->path;
+      unlink $c->stash('cgi.stdin')->path;
       $c->stash('cgi.cb')->();
       warn "[$pid] Finishing up\n" if DEBUG;
       $c->finish;
@@ -265,7 +265,7 @@ sub _mime_data {
 
   my $mime_string = $self->_normalize($mime->stringify);
 
-  my $stdin = Mojo::Asset::File->new(cleanup=>0);
+  my $stdin = Mojo::Asset::File->new;
   $stdin->add_chunk($mime_string);
 
   $content_type = "multipart/form-data; boundary=" . $mime->head->multipart_boundary;
