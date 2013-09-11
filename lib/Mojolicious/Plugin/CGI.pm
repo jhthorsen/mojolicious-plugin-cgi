@@ -276,6 +276,7 @@ sub _normalize {
   my $self = shift;
   my $mime_string = shift;
   my $EOL = "\015\012";
+  $mime_string =~ s{;\r?\n\s+([\w-]+\s*=\s*"?([^"]*)"?)}{; $1}xmsg;
   $mime_string =~ s{([\w-]+:\s+[^\n]+)\n\n}{$1$EOL$EOL}xmsg;
   $mime_string =~ s{\n([\w-]+:\s+)}{$EOL$1}xmsg;
   $mime_string =~ s{\n(-------)}{$EOL$1}xmsg;
