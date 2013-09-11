@@ -5,6 +5,7 @@ WriteMakefile(
   AUTHOR => 'Jan Henning Thorsen <jhthorsen@cpan.org>',
   PREREQ_PM => {
     'Mojolicious' => '4.00',
+    'MIME::Entity' => '5.427',
   },
   test => {
     TESTS => 't/*.t',

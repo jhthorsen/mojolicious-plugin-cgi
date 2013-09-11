@@ -40,6 +40,7 @@ use File::Spec;
 use Sys::Hostname;
 use POSIX ':sys_wait_h';
 use Socket;
+use MIME::Entity;
 use constant CHUNK_SIZE => 131072;
 use constant CHECK_CHILD_INTERVAL => $ENV{CHECK_CHILD_INTERVAL} || 0.01;
 use constant DEBUG => $ENV{MOJO_PLUGIN_CGI_DEBUG} || 0;
@@ -84,7 +85,7 @@ Additional static variables:
 =cut
 
 sub emulate_environment {
-  my($self, $c) = @_;
+  my($self, $c, $type, $length) = @_;
   my $tx = $c->tx;
   my $req = $tx->req;
   my $headers = $req->headers;
@@ -95,8 +96,8 @@ sub emulate_environment {
 
   return(
     %{ $self->env },
-    CONTENT_LENGTH => $headers->content_length || 0,
-    CONTENT_TYPE => $headers->content_type || '',
+    CONTENT_LENGTH => $length || $headers->content_length || 0,
+    CONTENT_TYPE => $type || $headers->content_type || '',
     GATEWAY_INTERFACE => 'CGI/1.1',
     HTTP_COOKIE => $headers->cookie || '',
     HTTP_HOST => $headers->host || '',
@@ -158,7 +159,10 @@ sub register {
     my $c = shift->render_later;
     my $ioloop = Mojo::IOLoop->singleton;
     my $reactor = $ioloop->reactor;
-    my $stdin = $c->req->content->asset;
+    my ($stdin,$type,$length);
+    if (!$c->req->content->is_multipart) {
+      $stdin = $c->req->content->asset;
+    }
     my $delay = $ioloop->delay;
     my($pid, $tid, $reader, $stdout_read, $stdout_write);
 
@@ -167,10 +171,10 @@ sub register {
     unless(pipe $stdout_read, $stdout_write) {
       return $c->render_exception("pipe: $!");
     }
-    unless($c->req->content->isa('Mojo::Content::Single')) {
-      return $c->render_exception('Can only handle Mojo::Content::Single requests');
+    if(!$c->req->content->isa('Mojo::Content::Single')) {
+      ($stdin, $type, $length) = $self->_mime_data($c);
     }
-    unless($stdin->isa('Mojo::Asset::File')) {
+    elsif(!$stdin->isa('Mojo::Asset::File')) {
       warn "Converting $stdin to Mojo::Asset::File\n" if DEBUG;
       $stdin = Mojo::Asset::File->new->add_chunk($stdin->slurp);
     }
@@ -185,7 +189,7 @@ sub register {
     }
     unless($pid) {
       warn "[$$] Starting child process\n" if DEBUG;
-      %ENV = $self->emulate_environment($c);
+      %ENV = $self->emulate_environment($c, $type, $length);
       close $stdout_read;
       open STDIN, '<', $stdin->path or die "Could not open @{[$stdin->path]}: $!" if -s $stdin->path;
       open STDOUT, '>&' . fileno $stdout_write or die $!;
@@ -243,14 +247,46 @@ sub _stdout_callback {
   }
 }
 
+sub _mime_data {
+  my ($self, $c) = @_;
+
+  my $content_type = $c->req->content->headers->content_type;
+  $content_type =~ s/; boundary=.*//;
+  my $mime = MIME::Entity->build(
+    'Type' => $content_type,
+  );
+
+  foreach my $part (@{$c->req->content->parts}) {
+    $mime->attach(
+      %{$part->headers->to_hash},
+      Data => $part->asset->slurp,
+    );
+  }
+
+  my $mime_string = $self->_normalize($mime->stringify);
+
+  my $stdin = Mojo::Asset::File->new;
+  $stdin->add_chunk($mime_string);
+
+  $content_type = "multipart/form-data; boundary=" . $mime->head->multipart_boundary;
+  return ($stdin, $content_type, length($mime_string));
+}
+
+sub _normalize {
+  my $self = shift;
+  my $mime_string = shift;
+  my $EOL = "\015\012";
+  $mime_string =~ s{;\r?\n\s+([\w-]+\s*=\s*"?([^"]*)"?)}{; $1}xmsg;
+  $mime_string =~ s{([\w-]+:\s+[^\n]+)\n\n}{$1$EOL$EOL}xmsg;
+  $mime_string =~ s{\n([\w-]+:\s+)}{$EOL$1}xmsg;
+  $mime_string =~ s{\n(-------)}{$EOL$1}xmsg;
+  return $mime_string;
+}
+
 =head1 AUTHOR
 
 Jan Henning Thorsen - C<jhthorsen@cpan.org>
 
 =cut
-
-1;
-
-1;
 
 1;
