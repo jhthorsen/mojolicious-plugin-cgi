@@ -1,0 +1,8 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+
+print "Content-Type: text/custom\n\r\n\r";
+print "$$\n";
+print "=== $ENV{$_}\n" for qw/CONTENT_TYPE CONTENT_LENGTH/;
+print "--- $_" while <STDIN>;

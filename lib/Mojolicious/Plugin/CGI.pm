@@ -93,9 +93,12 @@ sub emulate_environment {
 
   $script_name =~ s!^/?\Q$base_path\E/?!!;
 
+  my $content_length = $req->content->is_multipart
+    ? $req->body_size : $headers->content_length;
+
   return(
     %{ $self->env },
-    CONTENT_LENGTH => $headers->content_length || 0,
+    CONTENT_LENGTH => $content_length || 0,
     CONTENT_TYPE => $headers->content_type || '',
     GATEWAY_INTERFACE => 'CGI/1.1',
     HTTP_COOKIE => $headers->cookie || '',
@@ -158,7 +161,7 @@ sub register {
     my $c = shift->render_later;
     my $ioloop = Mojo::IOLoop->singleton;
     my $reactor = $ioloop->reactor;
-    my $stdin = $c->req->content->asset;
+    my $stdin;
     my $delay = $ioloop->delay;
     my($pid, $tid, $reader, $stdout_read, $stdout_write);
 
@@ -167,9 +170,15 @@ sub register {
     unless(pipe $stdout_read, $stdout_write) {
       return $c->render_exception("pipe: $!");
     }
-    unless($c->req->content->isa('Mojo::Content::Single')) {
+    if ($c->req->content->is_multipart) {
+      $stdin = Mojo::Asset::File->new;
+      $stdin->add_chunk($c->req->build_body);
+    } elsif(!$c->req->content->isa('Mojo::Content::Single')) {
       return $c->render_exception('Can only handle Mojo::Content::Single requests');
+    } else {
+      $stdin = $c->req->content->asset;
     }
+
     unless($stdin->isa('Mojo::Asset::File')) {
       warn "Converting $stdin to Mojo::Asset::File\n" if DEBUG;
       $stdin = Mojo::Asset::File->new->add_chunk($stdin->slurp);
@@ -248,9 +257,5 @@ sub _stdout_callback {
 Jan Henning Thorsen - C<jhthorsen@cpan.org>
 
 =cut
-
-1;
-
-1;
 
 1;
