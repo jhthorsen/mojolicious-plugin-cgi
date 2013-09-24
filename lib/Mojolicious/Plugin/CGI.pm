@@ -173,8 +173,6 @@ sub register {
     if ($c->req->content->is_multipart) {
       $stdin = Mojo::Asset::File->new;
       $stdin->add_chunk($c->req->build_body);
-    } elsif(!$c->req->content->isa('Mojo::Content::Single')) {
-      return $c->render_exception('Can only handle Mojo::Content::Single requests');
     } else {
       $stdin = $c->req->content->asset;
     }
