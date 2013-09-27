@@ -6,6 +6,11 @@ WriteMakefile(
   PREREQ_PM => {
     'Mojolicious' => '4.00',
   },
+  META_MERGE => {
+    resources => {
+      repository => 'https://github.com/jhthorsen/mojolicious-plugin-cgi',
+    },
+  },
   test => {
     TESTS => 't/*.t',
   },
