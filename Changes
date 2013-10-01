@@ -1,5 +1,8 @@
 Revision history for Mojolicious-Plugin-CGI
 
+0.0601   Tue Oct  1 12:36:25 2013
+       * Add repository to Makefile.PL
+
 0.06     Tue Sep 24 09:43:37 2013
        * Add support multipart requests
          lee@givengain.ch
