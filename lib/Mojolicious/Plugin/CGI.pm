@@ -89,8 +89,6 @@ sub emulate_environment {
   my $tx = $c->tx;
   my $req = $tx->req;
   my $headers = $req->headers;
-  my $base_path = $req->url->base->path;
-  my $script_name = $req->url->path;
   my $remote_user = '';
 
   if(my $userinfo = $c->req->url->to_abs->userinfo) {
@@ -99,8 +97,6 @@ sub emulate_environment {
   elsif($c->session('username')) {
     $remote_user = $c->session('username');
   }
-
-  $script_name =~ s!^/?\Q$base_path\E/?!!;
 
   my $content_length = $req->content->is_multipart
     ? $req->body_size : $headers->content_length;
@@ -116,7 +112,7 @@ sub emulate_environment {
     HTTP_USER_AGENT => $headers->user_agent || '',
     HTTPS => $req->is_secure ? 'YES' : 'NO',
     #PATH => $req->url->path,
-    PATH_INFO => $req->url->path,
+    PATH_INFO => '/' .($c->stash('path_info') || ''),
     QUERY_STRING => $req->url->query->to_string,
     REMOTE_ADDR => $tx->remote_address,
     REMOTE_HOST => gethostbyaddr(inet_aton($tx->remote_address || '127.0.0.1'), AF_INET) || '',
@@ -124,7 +120,7 @@ sub emulate_environment {
     REMOTE_USER => $remote_user,
     REQUEST_METHOD => $req->method,
     SCRIPT_FILENAME => $self->{script},
-    SCRIPT_NAME => $script_name,
+    SCRIPT_NAME => $self->{route}->render(''),
     SERVER_ADMIN => $ENV{USER} || '',
     SERVER_NAME => hostname,
     SERVER_PORT => $tx->local_port,
@@ -165,7 +161,8 @@ sub register {
   $self->{script} = File::Spec->rel2abs($self->{script});
   -r $self->{script} or die "Cannot read $self->{script}";
   $self->{name} = basename $self->{script};
-  $self->{route} = $app->routes->any($self->{route}) unless ref $self->{route};
+  $self->{route} = $app->routes->any("$self->{route}/*path_info", { path_info => '' }) unless ref $self->{route};
+  $self->{prefix_length} = length $self->{route}->render('');
   $self->{route}->to(cb => sub {
     my $c = shift->render_later;
     my $ioloop = Mojo::IOLoop->singleton;
