@@ -1,0 +1,4 @@
+#!/usr/bin/env perl
+warn "yikes!";
+print "Content-Type: text/plain\n\r\n\r";
+print "yayayyaya\n";

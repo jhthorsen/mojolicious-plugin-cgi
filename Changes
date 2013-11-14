@@ -2,6 +2,7 @@ Revision history for Mojolicious-Plugin-CGI
 
 0.07
        * Reads userinfo from request path
+       * Add support for errlog
 
 0.06     Tue Sep 24 09:43:37 2013
        * Add support multipart requests

@@ -23,6 +23,7 @@ matter.
     route => '/mount/point',
     script => '/path/to/cgi/script.pl',
     env => {}, # default is \%ENV
+    errlog => '/path/to/file.log', # path to where STDERR from cgi script goes
     before => sub { # called before setup and script start
       my $c = shift;
       # modify QUERY_STRING
@@ -204,6 +205,7 @@ sub register {
       close $stdout_read;
       open STDIN, '<', $stdin->path or die "Could not open @{[$stdin->path]}: $!" if -s $stdin->path;
       open STDOUT, '>&' . fileno $stdout_write or die $!;
+      open STDERR, '>>', $self->{errlog} if $self->{errlog};
       select STDOUT;
       $| = 1;
       { exec $self->{script} }
