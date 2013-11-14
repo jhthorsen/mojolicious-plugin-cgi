@@ -90,6 +90,14 @@ sub emulate_environment {
   my $headers = $req->headers;
   my $base_path = $req->url->base->path;
   my $script_name = $req->url->path;
+  my $remote_user = '';
+
+  if(my $userinfo = $c->req->url->to_abs->userinfo) {
+    $remote_user = $userinfo =~ /([^:]+)/ ? $1 : '';
+  }
+  elsif($c->session('username')) {
+    $remote_user = $c->session('username');
+  }
 
   $script_name =~ s!^/?\Q$base_path\E/?!!;
 
@@ -112,7 +120,7 @@ sub emulate_environment {
     REMOTE_ADDR => $tx->remote_address,
     REMOTE_HOST => gethostbyaddr(inet_aton($tx->remote_address || '127.0.0.1'), AF_INET) || '',
     REMOTE_PORT => $tx->remote_port,
-    REMOTE_USER => $c->session('username') || '', # TODO: Should probably be configurable
+    REMOTE_USER => $remote_user,
     REQUEST_METHOD => $req->method,
     SCRIPT_FILENAME => $self->{script},
     SCRIPT_NAME => $script_name,
