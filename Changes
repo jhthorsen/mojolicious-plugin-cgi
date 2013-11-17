@@ -1,6 +1,6 @@
 Revision history for Mojolicious-Plugin-CGI
 
-0.07
+0.07     Sun Nov 17 14:11:59 2013
        * Reads userinfo from request path
        * Add support for errlog
        * Fix PATH_INFO and SCRIPT_NAME
