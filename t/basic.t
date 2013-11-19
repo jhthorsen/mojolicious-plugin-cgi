@@ -32,7 +32,7 @@ $t->get_ok($t->tx->req->url->clone->userinfo('testdummy:foopass')->path('/env/ba
   ->content_like(qr{^PATH_INFO=/foo}m, 'PATH_INFO=/env/basic')
   ->content_like(qr{^QUERY_STRING=query=123}m, 'QUERY_STRING=query=123')
   ->content_like(qr{^REMOTE_ADDR=\d+\S+}m, 'REMOTE_ADDR=\d+\S+')
-  ->content_like(qr{^REMOTE_HOST=localhost}m, 'REMOTE_HOST=localhost')
+  ->content_like(qr{^REMOTE_HOST=[\w\.]+}m, 'REMOTE_HOST=')
   ->content_like(qr{^REMOTE_PORT=\w+}m, 'REMOTE_PORT=\w+')
   ->content_like(qr{^REMOTE_USER=testdummy}m, 'REMOTE_USER=testdummy')
   ->content_like(qr{^REQUEST_METHOD=GET}m, 'REQUEST_METHOD=GET')
