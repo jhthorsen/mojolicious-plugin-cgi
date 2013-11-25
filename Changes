@@ -1,6 +1,7 @@
 Revision history for Mojolicious-Plugin-CGI
 
 0.0701
+       * Flushing STDERR as well
        * Fix REMOTE_HOST test on windows
          http://www.cpantesters.org/cpan/report/99cac79a-725d-1014-82ca-1dcb5cf4dae8
          REMOTE_HOST=599DSOLIMANO01.cowen.corp != localhost

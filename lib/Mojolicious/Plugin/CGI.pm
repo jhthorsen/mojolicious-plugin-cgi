@@ -203,8 +203,8 @@ sub register {
       open STDIN, '<', $stdin->path or die "Could not open @{[$stdin->path]}: $!" if -s $stdin->path;
       open STDOUT, '>&' . fileno $stdout_write or die $!;
       open STDERR, '>>', $self->{errlog} if $self->{errlog};
-      select STDOUT;
-      $| = 1;
+      select STDERR; $| = 1;
+      select STDOUT; $| = 1;
       { exec $self->{script} }
       die "Could not execute $self->{script}: $!";
     }
