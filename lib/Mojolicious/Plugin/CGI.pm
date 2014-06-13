@@ -6,7 +6,7 @@ Mojolicious::Plugin::CGI - Run CGI script from Mojolicious
 
 =head1 VERSION
 
-0.08
+0.09
 
 =head1 DESCRIPTION
 
@@ -45,7 +45,7 @@ use constant CHUNK_SIZE => 131072;
 use constant CHECK_CHILD_INTERVAL => $ENV{CHECK_CHILD_INTERVAL} || 0.01;
 use constant DEBUG => $ENV{MOJO_PLUGIN_CGI_DEBUG} || 0;
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 our %ORIGINAL_ENV = %ENV;
 
 =head1 METHODS
