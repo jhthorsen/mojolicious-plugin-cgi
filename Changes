@@ -4,7 +4,6 @@ Revision history for Mojolicious-Plugin-CGI
        * Fix Can't use string ("") as a HASH ref while "strict refs" in use
          at Mojolicious::Routes::Pattern line 63.
 
-
 0.09     Fri Jun 13 11:56:31 2014
        * Add README.pod to MANIFEST.SKIP
          https://github.com/jhthorsen/mojolicious-plugin-cgi/issues/9
