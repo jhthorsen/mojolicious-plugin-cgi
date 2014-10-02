@@ -2,23 +2,19 @@ use warnings;
 use strict;
 use Test::More;
 use Test::Mojo;
+use Mojolicious;
 
 plan skip_all => 't/cgi-bin/errlog' unless -x 't/cgi-bin/errlog';
 
-{
-  use Mojolicious::Lite;
-  plugin CGI => {
-    route => '/err',
-    script => 't/cgi-bin/errlog',
-    errlog => 't/err.log',
-  };
-}
-
-my $t = Test::Mojo->new;
-my $s;
 unlink 't/err.log';
 
 {
+  my $app = Mojolicious->new;
+  my $t = Test::Mojo->new($app);
+  my $s;
+
+  $app->plugin(CGI => { route => '/err', script => 't/cgi-bin/errlog', errlog => 't/err.log' });
+
   $t->get_ok('/err');
   $s = -s 't/err.log';
   ok $s, 't/err.log has data';

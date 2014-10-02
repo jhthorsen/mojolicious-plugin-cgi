@@ -1,5 +1,9 @@
 Revision history for Mojolicious-Plugin-CGI
 
+0.11
+       * Refactored the code using IO::Pipely
+       * env() is an attribute
+
 0.10     Thu Oct  2 21:31:18 2014
        * Fix Can't use string ("") as a HASH ref while "strict refs" in use
          at Mojolicious::Routes::Pattern line 63.

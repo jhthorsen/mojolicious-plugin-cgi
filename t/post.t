@@ -3,6 +3,8 @@ use strict;
 use Test::More;
 use Test::Mojo;
 
+my @pipes = get_pipes();
+
 plan skip_all => 't/cgi-bin/postman' unless -x 't/cgi-bin/postman';
 
 {
@@ -20,26 +22,26 @@ my $pid = $t->tx->res->body =~ /(\d+)/ ? $1 : 0;
 
 diag $pid;
 
-if($pid) {
+if ($pid) {
   ok !(kill 0, $pid), 'child is taken care of';
 }
 else {
-  ok $pid, 'could not get pid';
+  ok 0, 'could not get pid from cgi output';
 }
 
-# FIXME? possibly not the best way to test if there is a pipe leak
-SKIP: {
-  skip "test for leaky pipes under Debian build", 1
-    if $ENV{DEBIAN_BUILD};
+is_deeply \@pipes, [get_pipes()], 'no leaky leaks';
 
-  if (-d "/proc/$$/fd") {
-    my $pipes = grep { defined $_ ? /pipe:/ : undef }
-      map { readlink("/proc/$$/fd/".(split '/')[-1]) }
-        glob "/proc/$$/fd/*";
+sub get_pipes {
+  return diag "unable to test leaky pipes", 1 unless -d "/proc/$$/fd";
+  return diag "test for leaky pipes under Debian build", 1 if $ENV{DEBIAN_BUILD};
 
-    note "pipes:$pipes";
-    ok( !($pipes % 2),'no leaky pipes');
+  my @pipes;
+  for my $fd (glob "/proc/$$/fd/*") {
+    my $pts = readlink sprintf '/proc/%s/fd/%s', $$, +(split '/', $fd)[-1] or next;
+    push @pipes, $pts if $pts =~ /pipe:/;
   }
+
+  return sort @pipes;
 }
 
 done_testing;
