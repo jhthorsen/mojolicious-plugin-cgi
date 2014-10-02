@@ -1,6 +1,6 @@
 Revision history for Mojolicious-Plugin-CGI
 
-0.10
+0.10     Thu Oct  2 21:31:18 2014
        * Fix Can't use string ("") as a HASH ref while "strict refs" in use
          at Mojolicious::Routes::Pattern line 63.
 
