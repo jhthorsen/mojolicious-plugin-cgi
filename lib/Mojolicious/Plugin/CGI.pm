@@ -120,7 +120,7 @@ sub emulate_environment {
     REMOTE_USER => $remote_user,
     REQUEST_METHOD => $req->method,
     SCRIPT_FILENAME => $self->{script},
-    SCRIPT_NAME => $self->{route}->render(''),
+    SCRIPT_NAME => $c->url_for($self->{route}->name),
     SERVER_ADMIN => $ENV{USER} || '',
     SERVER_NAME => hostname,
     SERVER_PORT => $tx->local_port,
@@ -160,9 +160,7 @@ sub register {
 
   $self->{script} = File::Spec->rel2abs($self->{script});
   -r $self->{script} or die "Cannot read $self->{script}";
-  $self->{name} = basename $self->{script};
   $self->{route} = $app->routes->any("$self->{route}/*path_info", { path_info => '' }) unless ref $self->{route};
-  $self->{prefix_length} = length $self->{route}->render('');
   $self->{route}->to(cb => sub {
     my $c = shift->render_later;
     my $ioloop = Mojo::IOLoop->singleton;
