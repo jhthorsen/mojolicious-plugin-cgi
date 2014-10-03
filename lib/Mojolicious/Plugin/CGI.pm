@@ -36,6 +36,7 @@ matter.
 =cut
 
 use Mojo::Base 'Mojolicious::Plugin';
+use Mojo::Util 'b64_decode';
 use File::Basename;
 use File::Spec;
 use Sys::Hostname;
@@ -96,19 +97,19 @@ Additional static variables:
 
 sub emulate_environment {
   my ($self, $c) = @_;
-  my $tx          = $c->tx;
-  my $req         = $tx->req;
-  my $headers     = $req->headers;
-  my $remote_user = '';
+  my $tx             = $c->tx;
+  my $req            = $tx->req;
+  my $headers        = $req->headers;
+  my $content_length = $req->content->is_multipart ? $req->body_size : $headers->content_length;
+  my $remote_user    = '';
 
   if (my $userinfo = $c->req->url->to_abs->userinfo) {
     $remote_user = $userinfo =~ /([^:]+)/ ? $1 : '';
   }
-  elsif ($c->session('username')) {
-    $remote_user = $c->session('username');
+  elsif (my $authenticate = $headers->authorization) {
+    $remote_user = $authenticate =~ /Basic\s+(.*)/ ? b64_decode $1 : '';
+    $remote_user = $remote_user =~ /([^:]+)/       ? $1            : '';
   }
-
-  my $content_length = $req->content->is_multipart ? $req->body_size : $headers->content_length;
 
   return (
     %{$self->env},
