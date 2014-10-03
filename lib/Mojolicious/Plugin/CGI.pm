@@ -42,13 +42,13 @@ use Sys::Hostname;
 use IO::Pipely 'pipely';
 use POSIX 'WNOHANG';
 use Socket qw( AF_INET inet_aton );
-use constant CHUNK_SIZE => 131072;
+use constant CHUNK_SIZE           => 131072;
 use constant CHECK_CHILD_INTERVAL => $ENV{CHECK_CHILD_INTERVAL} || 0.01;
-use constant DEBUG => $ENV{MOJO_PLUGIN_CGI_DEBUG} || 0;
-use constant READ => 0;
-use constant WRITE => 1;
+use constant DEBUG                => $ENV{MOJO_PLUGIN_CGI_DEBUG} || 0;
+use constant READ                 => 0;
+use constant WRITE                => 1;
 
-our $VERSION = '0.10';
+our $VERSION      = '0.10';
 our %ORIGINAL_ENV = %ENV;
 
 =head1 ATTRIBUTES
@@ -65,7 +65,7 @@ Holds a L<Mojo::IOLoop> object.
 
 =cut
 
-has env => sub { +{ %ORIGINAL_ENV } };
+has env    => sub { +{%ORIGINAL_ENV} };
 has ioloop => sub { Mojo::IOLoop->singleton };
 
 =head1 METHODS
@@ -95,46 +95,46 @@ Additional static variables:
 =cut
 
 sub emulate_environment {
-  my($self, $c) = @_;
-  my $tx = $c->tx;
-  my $req = $tx->req;
-  my $headers = $req->headers;
+  my ($self, $c) = @_;
+  my $tx          = $c->tx;
+  my $req         = $tx->req;
+  my $headers     = $req->headers;
   my $remote_user = '';
 
-  if(my $userinfo = $c->req->url->to_abs->userinfo) {
+  if (my $userinfo = $c->req->url->to_abs->userinfo) {
     $remote_user = $userinfo =~ /([^:]+)/ ? $1 : '';
   }
-  elsif($c->session('username')) {
+  elsif ($c->session('username')) {
     $remote_user = $c->session('username');
   }
 
-  my $content_length = $req->content->is_multipart
-    ? $req->body_size : $headers->content_length;
+  my $content_length = $req->content->is_multipart ? $req->body_size : $headers->content_length;
 
-  return(
-    %{ $self->env },
-    CONTENT_LENGTH => $content_length || 0,
-    CONTENT_TYPE => $headers->content_type || '',
+  return (
+    %{$self->env},
+    CONTENT_LENGTH => $content_length        || 0,
+    CONTENT_TYPE   => $headers->content_type || '',
     GATEWAY_INTERFACE => 'CGI/1.1',
-    HTTP_COOKIE => $headers->cookie || '',
-    HTTP_HOST => $headers->host || '',
-    HTTP_REFERER => $headers->referrer || '',
-    HTTP_USER_AGENT => $headers->user_agent || '',
-    HTTPS => $req->is_secure ? 'YES' : 'NO',
+    HTTP_COOKIE       => $headers->cookie || '',
+    HTTP_HOST         => $headers->host || '',
+    HTTP_REFERER      => $headers->referrer || '',
+    HTTP_USER_AGENT   => $headers->user_agent || '',
+    HTTPS             => $req->is_secure ? 'YES' : 'NO',
+
     #PATH => $req->url->path,
-    PATH_INFO => '/' .($c->stash('path_info') || ''),
-    QUERY_STRING => $req->url->query->to_string,
-    REMOTE_ADDR => $tx->remote_address,
-    REMOTE_HOST => gethostbyaddr(inet_aton($tx->remote_address || '127.0.0.1'), AF_INET) || '',
-    REMOTE_PORT => $tx->remote_port,
-    REMOTE_USER => $remote_user,
-    REQUEST_METHOD => $req->method,
+    PATH_INFO => '/' . ($c->stash('path_info') || ''),
+    QUERY_STRING    => $req->url->query->to_string,
+    REMOTE_ADDR     => $tx->remote_address,
+    REMOTE_HOST     => gethostbyaddr(inet_aton($tx->remote_address || '127.0.0.1'), AF_INET) || '',
+    REMOTE_PORT     => $tx->remote_port,
+    REMOTE_USER     => $remote_user,
+    REQUEST_METHOD  => $req->method,
     SCRIPT_FILENAME => $self->{script},
-    SCRIPT_NAME => $c->url_for($self->{route}->name),
+    SCRIPT_NAME     => $c->url_for($self->{route}->name),
     SERVER_ADMIN => $ENV{USER} || '',
-    SERVER_NAME => hostname,
-    SERVER_PORT => $tx->local_port,
-    SERVER_PROTOCOL => $req->is_secure ? 'HTTPS' : 'HTTP', # TODO: Version is missing
+    SERVER_NAME  => hostname,
+    SERVER_PORT  => $tx->local_port,
+    SERVER_PROTOCOL => $req->is_secure ? 'HTTPS' : 'HTTP',    # TODO: Version is missing
     SERVER_SOFTWARE => __PACKAGE__,
   );
 }
@@ -158,71 +158,76 @@ sub register {
   my $before;
 
   if (ref $args eq 'ARRAY') {
-    $self->{route} = shift @$args;
+    $self->{route}  = shift @$args;
     $self->{script} = shift @$args;
   }
   else {
     $self->{$_} ||= $args->{$_} for keys %$args;
   }
 
-  $before = $self->{before} || sub {};
-  $app->defaults->{'mojolicious_plugin_cgi.tid'} ||= $self->ioloop->recurring(CHECK_CHILD_INTERVAL, sub { _waitpids($pids); });
+  $before = $self->{before} || sub { };
+  $app->defaults->{'mojolicious_plugin_cgi.tid'}
+    ||= $self->ioloop->recurring(CHECK_CHILD_INTERVAL, sub { _waitpids($pids); });
 
   $self->{script} = File::Spec->rel2abs($self->{script}) || $self->{script};
-  $self->{route} = $app->routes->any("$self->{route}/*path_info", { path_info => '' }) unless ref $self->{route};
-  $self->{route}->to(cb => sub {
-    my $c = shift;
-    my $log = $c->app->log;
-    my @stderr = $self->{errlog} ? () : pipely;
-    my @stdout = pipely;
-    my $stdin = $self->_stdin($c);
-    my $pid;
+  $self->{route} = $app->routes->any("$self->{route}/*path_info", {path_info => ''}) unless ref $self->{route};
+  $self->{route}->to(
+    cb => sub {
+      my $c      = shift;
+      my $log    = $c->app->log;
+      my @stderr = $self->{errlog} ? () : pipely;
+      my @stdout = pipely;
+      my $stdin  = $self->_stdin($c);
+      my $pid;
 
-    $c->$before;
-    defined($pid = fork) or die "Failed to fork: $!";
+      $c->$before;
+      defined($pid = fork) or die "Failed to fork: $!";
 
-    unless ($pid) {
-      my @STDERR = @stderr ? ('>&', fileno $stderr[WRITE]) : ('>>', $self->{errlog});
-      warn "[CGI:$$] <<< (@{[$stdin->slurp]})\n" if DEBUG;
-      %ENV = $self->emulate_environment($c);
-      open STDIN, '<', $stdin->path or die "STDIN @{[$stdin->path]}: $!" if -s $stdin->path;
-      open STDERR, $STDERR[0], $STDERR[1] or die "STDERR: @stderr: $!";
-      open STDOUT, '>&', fileno $stdout[WRITE] or die "STDOUT: $!";
-      select STDERR; $| = 1;
-      select STDOUT; $| = 1;
-      { exec $self->{script} }
-      die "Could not execute $self->{script}: $!";
+      unless ($pid) {
+        my @STDERR = @stderr ? ('>&', fileno $stderr[WRITE]) : ('>>', $self->{errlog});
+        warn "[CGI:$$] <<< (@{[$stdin->slurp]})\n" if DEBUG;
+        %ENV = $self->emulate_environment($c);
+        open STDIN, '<', $stdin->path or die "STDIN @{[$stdin->path]}: $!" if -s $stdin->path;
+        open STDERR, $STDERR[0], $STDERR[1] or die "STDERR: @stderr: $!";
+        open STDOUT, '>&', fileno $stdout[WRITE] or die "STDOUT: $!";
+        select STDERR;
+        $| = 1;
+        select STDOUT;
+        $| = 1;
+        { exec $self->{script} }
+        die "Could not execute $self->{script}: $!";
+      }
+
+      $log->debug("[CGI:$pid] START $self->{script}");
+
+      for my $p (\@stdout, \@stderr) {
+        next unless $p->[READ];
+        close $p->[WRITE];
+        $p->[READ] = Mojo::IOLoop::Stream->new($p->[READ])->timeout(0);
+        $self->ioloop->stream($p->[READ]);
+      }
+
+      $c->delay(
+        sub {
+          my ($delay) = @_;
+          $c->stash('cgi.pid' => $pid, 'cgi.stdin' => $stdin);
+          $stderr[READ]->on(read => $self->_child_stderr_cb($log, $pid)) if $stderr[READ];
+          $stdout[READ]->on(read => $self->_child_stdout_cb($c, $pid));
+          $stdout[READ]->on(close => $delay->begin);
+        },
+        sub {
+          my ($delay) = @_;
+          warn "[CGI:$pid] Child closed STDOUT\n" if DEBUG;
+          unlink $stdin->path or die "Could not remove STDIN @{[$stdin->path]}" if -e $stdin->path;
+          $c->finish;
+        },
+      );
     }
-
-    $log->debug("[CGI:$pid] START $self->{script}");
-
-    for my $p (\@stdout, \@stderr) {
-      next unless $p->[READ];
-      close $p->[WRITE];
-      $p->[READ] = Mojo::IOLoop::Stream->new($p->[READ])->timeout(0);
-      $self->ioloop->stream($p->[READ]);
-    }
-
-    $c->delay(
-      sub {
-        my ($delay) = @_;
-        $c->stash('cgi.pid' => $pid, 'cgi.stdin' => $stdin);
-        $stderr[READ]->on(read => $self->_child_stderr_cb($log, $pid)) if $stderr[READ];
-        $stdout[READ]->on(read => $self->_child_stdout_cb($c, $pid));
-        $stdout[READ]->on(close => $delay->begin);
-      },
-      sub {
-        my ($delay) = @_;
-        warn "[CGI:$pid] Child closed STDOUT\n" if DEBUG;
-        unlink $stdin->path or die "Could not remove STDIN @{[$stdin->path]}" if -e $stdin->path;
-        $c->finish;
-      },
-    );
-  });
+  );
 }
 
 sub _child_stderr_cb {
-  my($self, $log, $pid) = @_;
+  my ($self, $log, $pid) = @_;
   my $buf = '';
 
   return sub {
@@ -242,12 +247,12 @@ sub _child_stdout_cb {
     my ($stream, $chunk) = @_;
     warn "[CGI:$pid] >>> ($chunk)\n" if DEBUG;
 
-    if ($headers) { # true if HTTP header has been written to client
+    if ($headers) {    # true if HTTP header has been written to client
       return $c->write($chunk);
     }
 
     $buf .= $chunk;
-    $buf =~ s/^(.*?\x0a\x0d?\x0a\x0d?)//s or return; # false until all headers has been read from the CGI script
+    $buf =~ s/^(.*?\x0a\x0d?\x0a\x0d?)//s or return;    # false until all headers has been read from the CGI script
     $headers = $1;
 
     if ($headers =~ /^HTTP/) {
@@ -255,7 +260,7 @@ sub _child_stdout_cb {
     }
     else {
       $c->res->code($headers =~ /Location:/ ? 302 : 200);
-      $c->res->parse($c->res->get_start_line_chunk(0) .$headers);
+      $c->res->parse($c->res->get_start_line_chunk(0) . $headers);
     }
 
     $c->write($buf) if length $buf;
@@ -282,7 +287,7 @@ sub _waitpids {
   my $pids = shift;
 
   for my $pid (keys %$pids) {
-    local $SIG{CHLD} = 'DEFAULT'; # no idea why i need to do this, but it seems like waitpid() below return -1 if not
+    local $SIG{CHLD} = 'DEFAULT';    # no idea why i need to do this, but it seems like waitpid() below return -1 if not
     local ($?, $!);
     next PID unless $pid == waitpid $pid, WNOHANG;
     delete $pids->{$pid};
