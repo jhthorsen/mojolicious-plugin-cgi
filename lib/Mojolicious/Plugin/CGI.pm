@@ -207,7 +207,7 @@ sub register {
       sub {
         my ($delay) = @_;
         warn "[CGI:$pid] Child closed STDOUT\n" if DEBUG;
-        unlink $stdin->path or die "Could not remove STDIN @{[$stdin->path]}";
+        unlink $stdin->path or die "Could not remove STDIN @{[$stdin->path]}" if -e $stdin->path;
         $c->finish;
       },
     );
