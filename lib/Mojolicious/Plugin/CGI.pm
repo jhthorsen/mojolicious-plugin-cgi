@@ -173,6 +173,7 @@ sub register {
   $self->{route}->to(cb => sub {
     my $c = shift;
     my $log = $c->app->log;
+    my @stderr = $self->{errlog} ? () : pipely;
     my @stdout = pipely;
     my $stdin = $self->_stdin($c);
     my $pid;
@@ -181,11 +182,12 @@ sub register {
     defined($pid = fork) or die "Failed to fork: $!";
 
     unless ($pid) {
+      my @STDERR = @stderr ? ('>&', fileno $stderr[WRITE]) : ('>>', $self->{errlog});
       warn "[CGI:$$] <<< (@{[$stdin->slurp]})\n" if DEBUG;
       %ENV = $self->emulate_environment($c);
-      open STDIN, '<', $stdin->path or die "Could not open @{[$stdin->path]}: $!" if -s $stdin->path;
-      open STDERR, '>>', $self->{errlog} or die $!;
-      open STDOUT, '>&' . fileno $stdout[WRITE] or die $!;
+      open STDIN, '<', $stdin->path or die "STDIN @{[$stdin->path]}: $!" if -s $stdin->path;
+      open STDERR, $STDERR[0], $STDERR[1] or die "STDERR: @stderr: $!";
+      open STDOUT, '>&', fileno $stdout[WRITE] or die "STDOUT: $!";
       select STDERR; $| = 1;
       select STDOUT; $| = 1;
       { exec $self->{script} }
@@ -193,14 +195,19 @@ sub register {
     }
 
     $log->debug("[CGI:$pid] START $self->{script}");
-    close $stdout[WRITE];
-    $stdout[READ] = Mojo::IOLoop::Stream->new($stdout[READ])->timeout(0);
-    $self->ioloop->stream($stdout[READ]);
+
+    for my $p (\@stdout, \@stderr) {
+      next unless $p->[READ];
+      close $p->[WRITE];
+      $p->[READ] = Mojo::IOLoop::Stream->new($p->[READ])->timeout(0);
+      $self->ioloop->stream($p->[READ]);
+    }
 
     $c->delay(
       sub {
         my ($delay) = @_;
         $c->stash('cgi.pid' => $pid, 'cgi.stdin' => $stdin);
+        $stderr[READ]->on(read => $self->_child_stderr_cb($log, $pid)) if $stderr[READ];
         $stdout[READ]->on(read => $self->_child_stdout_cb($c, $pid));
         $stdout[READ]->on(close => $delay->begin);
       },
@@ -212,6 +219,18 @@ sub register {
       },
     );
   });
+}
+
+sub _child_stderr_cb {
+  my($self, $log, $pid) = @_;
+  my $buf = '';
+
+  return sub {
+    my ($stream, $chunk) = @_;
+    warn "[CGI:$pid] !!! ($chunk)\n" if DEBUG;
+    $buf .= $chunk;
+    $log->warn("[CGI:$pid] ERR $1") while $buf =~ s!^(.+)[\r\n]+$!!m;
+  };
 }
 
 sub _child_stdout_cb {
