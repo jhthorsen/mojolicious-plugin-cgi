@@ -201,6 +201,7 @@ sub register {
       }
 
       $log->debug("[CGI:$name:$pid] START $self->{script}");
+      $pids->{$pid} = $name;
 
       for my $p (\@stdout, \@stderr) {
         next unless $p->[READ];
@@ -221,8 +222,7 @@ sub register {
           my ($delay) = @_;
           warn "[CGI:$name:$pid] Child closed STDOUT\n" if DEBUG;
           unlink $stdin->path or die "Could not remove STDIN @{[$stdin->path]}" if -e $stdin->path;
-          waitpid $pid, 0;
-          delete $pids->{$pid};
+          _waitpids($pids);
           $c->finish;
         },
       );
@@ -293,10 +293,10 @@ sub _waitpids {
   for my $pid (keys %$pids) {
     local $SIG{CHLD} = 'DEFAULT';    # no idea why i need to do this, but it seems like waitpid() below return -1 if not
     local ($?, $!);
-    next PID unless $pid == waitpid $pid, WNOHANG;
+    next unless $pid == waitpid $pid, WNOHANG;
     my $name = delete $pids->{$pid} || 'unknown';
     my ($exit_value, $signal) = ($? >> 8, $? & 127);
-    warn "[CGI:$name:$pid] Child is dead $exit_value ($signal)\n" if DEBUG;
+    warn "[CGI:$name:$pid] Child exit_value=$exit_value ($signal)\n" if DEBUG;
   }
 }
 
