@@ -156,7 +156,7 @@ C<$route> can be either a plain path or a route object.
 sub register {
   my ($self, $app, $args) = @_;
   my $pids = $app->defaults->{'mojolicious_plugin_cgi.pids'} ||= {};
-  my $before;
+  my ($before, $name);
 
   if (ref $args eq 'ARRAY') {
     $self->{route}  = shift @$args;
@@ -170,6 +170,7 @@ sub register {
   $app->defaults->{'mojolicious_plugin_cgi.tid'}
     ||= $self->ioloop->recurring(CHECK_CHILD_INTERVAL, sub { _waitpids($pids); });
 
+  $name = basename $self->{script};
   $self->{script} = File::Spec->rel2abs($self->{script}) || $self->{script};
   $self->{route} = $app->routes->any("$self->{route}/*path_info", {path_info => ''}) unless ref $self->{route};
   $self->{route}->to(
@@ -186,7 +187,7 @@ sub register {
 
       unless ($pid) {
         my @STDERR = @stderr ? ('>&', fileno $stderr[WRITE]) : ('>>', $self->{errlog});
-        warn "[CGI:$$] <<< (@{[$stdin->slurp]})\n" if DEBUG;
+        warn "[CGI:$name:$$] <<< (@{[$stdin->slurp]})\n" if DEBUG;
         %ENV = $self->emulate_environment($c);
         open STDIN, '<', $stdin->path or die "STDIN @{[$stdin->path]}: $!" if -s $stdin->path;
         open STDERR, $STDERR[0], $STDERR[1] or die "STDERR: @stderr: $!";
@@ -199,7 +200,7 @@ sub register {
         die "Could not execute $self->{script}: $!";
       }
 
-      $log->debug("[CGI:$pid] START $self->{script}");
+      $log->debug("[CGI:$name:$pid] START $self->{script}");
 
       for my $p (\@stdout, \@stderr) {
         next unless $p->[READ];
@@ -212,13 +213,13 @@ sub register {
         sub {
           my ($delay) = @_;
           $c->stash('cgi.pid' => $pid, 'cgi.stdin' => $stdin);
-          $stderr[READ]->on(read => $self->_child_stderr_cb($log, $pid)) if $stderr[READ];
-          $stdout[READ]->on(read => $self->_child_stdout_cb($c, $pid));
+          $stderr[READ]->on(read => $self->_stderr_cb($log, "CGI:$name:$pid")) if $stderr[READ];
+          $stdout[READ]->on(read => $self->_stdout_cb($c, "CGI:$name:$pid"));
           $stdout[READ]->on(close => $delay->begin);
         },
         sub {
           my ($delay) = @_;
-          warn "[CGI:$pid] Child closed STDOUT\n" if DEBUG;
+          warn "[CGI:$name:$pid] Child closed STDOUT\n" if DEBUG;
           unlink $stdin->path or die "Could not remove STDIN @{[$stdin->path]}" if -e $stdin->path;
           waitpid $pid, 0;
           delete $pids->{$pid};
@@ -229,26 +230,26 @@ sub register {
   );
 }
 
-sub _child_stderr_cb {
-  my ($self, $log, $pid) = @_;
+sub _stderr_cb {
+  my ($self, $log, $log_key) = @_;
   my $buf = '';
 
   return sub {
     my ($stream, $chunk) = @_;
-    warn "[CGI:$pid] !!! ($chunk)\n" if DEBUG;
+    warn "[$log_key] !!! ($chunk)\n" if DEBUG;
     $buf .= $chunk;
-    $log->warn("[CGI:$pid] ERR $1") while $buf =~ s!^(.+)[\r\n]+$!!m;
+    $log->warn("[$log_key] $1") while $buf =~ s!^(.+)[\r\n]+$!!m;
   };
 }
 
-sub _child_stdout_cb {
-  my ($self, $c, $pid) = @_;
+sub _stdout_cb {
+  my ($self, $c, $log_key) = @_;
   my $buf = '';
   my $headers;
 
   return sub {
     my ($stream, $chunk) = @_;
-    warn "[CGI:$pid] >>> ($chunk)\n" if DEBUG;
+    warn "[$log_key] >>> ($chunk)\n" if DEBUG;
 
     if ($headers) {    # true if HTTP header has been written to client
       return $c->write($chunk);
@@ -293,9 +294,9 @@ sub _waitpids {
     local $SIG{CHLD} = 'DEFAULT';    # no idea why i need to do this, but it seems like waitpid() below return -1 if not
     local ($?, $!);
     next PID unless $pid == waitpid $pid, WNOHANG;
-    delete $pids->{$pid};
+    my $name = delete $pids->{$pid} || 'unknown';
     my ($exit_value, $signal) = ($? >> 8, $? & 127);
-    warn "[CGI:$pid] Child is dead $exit_value ($signal)\n" if DEBUG;
+    warn "[CGI:$name:$pid] Child is dead $exit_value ($signal)\n" if DEBUG;
   }
 }
 

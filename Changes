@@ -1,5 +1,8 @@
 Revision history for Mojolicious-Plugin-CGI
 
+0.12
+       * Change default CGI logging prefix to "CGI:$name:$pid"
+
 0.11     Sun Oct  5 10:58:12 2014
        * Default STDERR logging goes to app log
        * Refactored the code using IO::Pipely

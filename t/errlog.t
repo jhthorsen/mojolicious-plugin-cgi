@@ -10,25 +10,27 @@ unlink 't/err.log';
 
 {
   my $app = Mojolicious->new;
-  my $t = Test::Mojo->new($app);
+  my $t   = Test::Mojo->new($app);
   my @err;
 
-  $app->plugin(CGI => { route => '/err', script => 't/cgi-bin/errlog' });
-  $app->log->on(message => sub {
-    my ($log, $level, $message) = @_;
-    push @err, $message if $level eq 'warn';
-  });
+  $app->plugin(CGI => {route => '/err', script => 't/cgi-bin/errlog'});
+  $app->log->on(
+    message => sub {
+      my ($log, $level, $message) = @_;
+      push @err, $message if $level eq 'warn';
+    }
+  );
 
   $t->get_ok('/err');
-  like $err[0], qr{\[CGI:\d+\] ERR yikes! at .*errlog line 2}, 'logged stderr';
+  like $err[0], qr{\[CGI:errlog:\d+\] yikes! at .*errlog line 2}, 'logged stderr';
 }
 
 {
   my $app = Mojolicious->new;
-  my $t = Test::Mojo->new($app);
+  my $t   = Test::Mojo->new($app);
   my $s;
 
-  $app->plugin(CGI => { route => '/err', script => 't/cgi-bin/errlog', errlog => 't/err.log' });
+  $app->plugin(CGI => {route => '/err', script => 't/cgi-bin/errlog', errlog => 't/err.log'});
 
   $t->get_ok('/err');
   $s = -s 't/err.log';
