@@ -1,6 +1,6 @@
 Revision history for Mojolicious-Plugin-CGI
 
-0.12
+0.12     Sun Oct  5 18:44:58 2014
        * Change default CGI logging prefix to "CGI:$name:$pid"
        * Fix _waitpids() actually survail hanging processes
 
