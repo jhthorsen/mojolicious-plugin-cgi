@@ -6,7 +6,7 @@ Mojolicious::Plugin::CGI - Run CGI script from Mojolicious
 
 =head1 VERSION
 
-0.12
+0.13
 
 =head1 DESCRIPTION
 
@@ -49,7 +49,7 @@ use constant DEBUG                => $ENV{MOJO_PLUGIN_CGI_DEBUG} || 0;
 use constant READ                 => 0;
 use constant WRITE                => 1;
 
-our $VERSION      = '0.12';
+our $VERSION      = '0.13';
 our %ORIGINAL_ENV = %ENV;
 
 =head1 ATTRIBUTES
@@ -186,6 +186,7 @@ sub register {
       defined($pid = fork) or die "Failed to fork: $!";
 
       unless ($pid) {
+        Mojo::IOLoop->reset;
         my @STDERR = @stderr ? ('>&', fileno $stderr[WRITE]) : ('>>', $self->{errlog});
         warn "[CGI:$name:$$] <<< (@{[$stdin->slurp]})\n" if DEBUG;
         %ENV = $self->emulate_environment($c);
