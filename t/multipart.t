@@ -23,7 +23,7 @@ $t->status_is(200);
 
 $t->content_like(qr{^\d+
 === multipart/form-data; boundary=(\w+)
-=== 337
+=== \d+
 --- --\1\r
 --- Content-Disposition: form-data; name="mytext"; filename="foo\.txt"\r
 --- \r
