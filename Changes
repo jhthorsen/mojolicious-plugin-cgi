@@ -1,5 +1,9 @@
 Revision history for Mojolicious-Plugin-CGI
 
+0.14     Fri Dec 12 13:27:17 2014
+       * Fix multipart test content length value
+         Contributor: leejo
+
 0.13     Mon Nov 17 15:13:31 2014
        * Reset IOLoop in fork to prevent fork from receiving connections
 
