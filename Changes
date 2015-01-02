@@ -1,5 +1,8 @@
 Revision history for Mojolicious-Plugin-CGI
 
+0.16     Fri Jan  2 13:24:59 2015
+       * Require Mojolicious 5.08
+
 0.15     Sun Dec 14 15:24:14 2014
        * Fix CPAN testers and HTTP_HOST regexp
 

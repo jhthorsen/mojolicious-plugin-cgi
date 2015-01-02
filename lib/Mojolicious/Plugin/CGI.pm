@@ -6,7 +6,7 @@ Mojolicious::Plugin::CGI - Run CGI script from Mojolicious
 
 =head1 VERSION
 
-0.15
+0.16
 
 =head1 DESCRIPTION
 
@@ -49,7 +49,7 @@ use constant DEBUG                => $ENV{MOJO_PLUGIN_CGI_DEBUG} || 0;
 use constant READ                 => 0;
 use constant WRITE                => 1;
 
-our $VERSION      = '0.15';
+our $VERSION      = '0.16';
 our %ORIGINAL_ENV = %ENV;
 
 =head1 ATTRIBUTES
