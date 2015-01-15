@@ -2,7 +2,7 @@ NAME
     Mojolicious::Plugin::CGI - Run CGI script from Mojolicious
 
 VERSION
-    0.16
+    0.17
 
 DESCRIPTION
     This plugin enable Mojolicious to run Perl CGI scripts. It does so by
@@ -10,6 +10,7 @@ DESCRIPTION
     in a non-blocking matter.
 
 SYNOPSIS
+  Standard usage
       use Mojolicious::Lite;
 
       plugin CGI => [ '/script' => '/path/to/cgi/script.pl' ];
@@ -26,6 +27,16 @@ SYNOPSIS
       };
 
       app->start;
+
+  Support for semicolon in query string
+      plugin CGI => { support_semicolon_in_query_string => 1 };
+
+    The code above need to be added before other plugins or handler which
+    use "url" in Mojo::Message::Request. It will inject a "before_dispatch"
+    hook which saves the original QUERY_STRING, before it is split on "&" in
+    Mojo::Parameters.
+
+    This is an EXPERIMENTAL feature.
 
 ATTRIBUTES
   env
