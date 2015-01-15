@@ -16,6 +16,8 @@ matter.
 
 =head1 SYNOPSIS
 
+=head2 Standard usage
+
   use Mojolicious::Lite;
 
   plugin CGI => [ '/script' => '/path/to/cgi/script.pl' ];
@@ -32,6 +34,17 @@ matter.
   };
 
   app->start;
+
+=head2 Support for semicolon in query string
+
+  plugin CGI => { support_semicolon_in_query_string => 1 };
+
+The code above need to be added before other plugins or handler which use
+L<Mojo::Message::Request/url>. It will inject a C<before_dispatch>
+hook which saves the original QUERY_STRING, before it is split on
+"&" in L<Mojo::Parameters>.
+
+This is an EXPERIMENTAL feature.
 
 =cut
 
@@ -124,17 +137,17 @@ sub emulate_environment {
 
     #PATH => $req->url->path,
     PATH_INFO => '/' . ($c->stash('path_info') || ''),
-    QUERY_STRING    => $req->url->query->to_string,
-    REMOTE_ADDR     => $tx->remote_address,
-    REMOTE_HOST     => gethostbyaddr(inet_aton($tx->remote_address || '127.0.0.1'), AF_INET) || '',
-    REMOTE_PORT     => $tx->remote_port,
-    REMOTE_USER     => $remote_user,
+    QUERY_STRING => $c->stash('cgi.query_string') || $req->url->query->to_string,
+    REMOTE_ADDR => $tx->remote_address,
+    REMOTE_HOST => gethostbyaddr(inet_aton($tx->remote_address || '127.0.0.1'), AF_INET) || '',
+    REMOTE_PORT => $tx->remote_port,
+    REMOTE_USER => $remote_user,
     REQUEST_METHOD  => $req->method,
     SCRIPT_FILENAME => $self->{script},
     SCRIPT_NAME     => $c->url_for($self->{route}->name),
-    SERVER_ADMIN => $ENV{USER} || '',
-    SERVER_NAME  => hostname,
-    SERVER_PORT  => $tx->local_port,
+    SERVER_ADMIN    => $ENV{USER} || '',
+    SERVER_NAME     => hostname,
+    SERVER_PORT     => $tx->local_port,
     SERVER_PROTOCOL => $req->is_secure ? 'HTTPS' : 'HTTP',    # TODO: Version is missing
     SERVER_SOFTWARE => __PACKAGE__,
   );
@@ -161,6 +174,10 @@ sub register {
   if (ref $args eq 'ARRAY') {
     $self->{route}  = shift @$args;
     $self->{script} = shift @$args;
+  }
+  elsif ($args->{support_semicolon_in_query_string}) {
+    $app->hook(before_dispatch => sub { $_[0]->stash('cgi.query_string' => $_[0]->req->url->query->to_string); });
+    return;
   }
   else {
     $self->{$_} ||= $args->{$_} for keys %$args;
