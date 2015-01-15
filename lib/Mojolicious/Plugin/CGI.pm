@@ -12,7 +12,7 @@ Mojolicious::Plugin::CGI - Run CGI script from Mojolicious
 
 This plugin enable L<Mojolicious> to run Perl CGI scripts. It does so by forking
 a new process with a modified environment and reads the STDOUT in a non-blocking
-matter.
+manner.
 
 =head1 SYNOPSIS
 
