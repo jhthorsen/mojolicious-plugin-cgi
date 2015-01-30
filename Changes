@@ -2,6 +2,7 @@ Revision history for Mojolicious-Plugin-CGI
 
 0.18
        * Fix SCRIPT_NAME environment variable
+       * Fix minimum Mojolicious version in cpanfile #13
 
 0.17     Thu Jan 15 17:19:57 2015
        * Add support for QUERY_STRING with ";" instead of "&"
