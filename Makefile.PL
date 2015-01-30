@@ -15,6 +15,6 @@ WriteMakefile(
     },
   },
   BUILD_REQUIRES => {'Test::More' => '0.88'},
-  PREREQ_PM      => {'IO::Pipely' => '0.005', 'Mojolicious' => '0'},
+  PREREQ_PM      => {'IO::Pipely' => '0.005', 'Mojolicious' => '5.08'},
   test           => {TESTS        => 't/*.t'},
 );
