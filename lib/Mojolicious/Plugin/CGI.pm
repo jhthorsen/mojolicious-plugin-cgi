@@ -144,10 +144,10 @@ sub emulate_environment {
     REMOTE_USER => $remote_user,
     REQUEST_METHOD  => $req->method,
     SCRIPT_FILENAME => $self->{script},
-    SCRIPT_NAME     => $c->url_for($self->{route}->name),
-    SERVER_ADMIN    => $ENV{USER} || '',
-    SERVER_NAME     => hostname,
-    SERVER_PORT     => $tx->local_port,
+    SCRIPT_NAME     => $c->url_for($self->{route}->name, {path_info => ''})->path->to_string,
+    SERVER_ADMIN => $ENV{USER} || '',
+    SERVER_NAME  => hostname,
+    SERVER_PORT  => $tx->local_port,
     SERVER_PROTOCOL => $req->is_secure ? 'HTTPS' : 'HTTP',    # TODO: Version is missing
     SERVER_SOFTWARE => __PACKAGE__,
   );
