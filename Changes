@@ -1,5 +1,8 @@
 Revision history for Mojolicious-Plugin-CGI
 
+0.19
+       * Will not test SERVER_ADMIN variable
+
 0.18     Fri Jan 30 09:57:46 2015
        * Fix SCRIPT_NAME environment variable
        * Fix minimum Mojolicious version in cpanfile #13
