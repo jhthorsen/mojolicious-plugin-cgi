@@ -31,14 +31,32 @@ else {
 
 is_deeply \@pipes, [get_pipes()], 'no leaky leaks';
 
+# Map lsof DEVICE and NAME to same pipe.
+my %LSOF_PIPE;
+
 sub get_pipes {
-  return diag "unable to test leaky pipes", 1 unless -d "/proc/$$/fd";
   return diag "test for leaky pipes under Debian build", 1 if $ENV{DEBIAN_BUILD};
 
   my @pipes;
-  for my $fd (glob "/proc/$$/fd/*") {
-    my $pts = readlink sprintf '/proc/%s/fd/%s', $$, +(split '/', $fd)[-1] or next;
-    push @pipes, $pts if $pts =~ /pipe:/;
+
+  if (-d "/proc/$$/fd") {
+    for my $fd (glob "/proc/$$/fd/*") {
+      my $pts = readlink sprintf '/proc/%s/fd/%s', $$, +(split '/', $fd)[-1] or next;
+      push @pipes, $pts if $pts =~ /pipe:/;
+    }
+  } elsif (`which lsof` =~ /\blsof$/) {
+    # Output of `lsof` for pipe looks like this:
+    #   COMMAND    PID   USER   FD   TYPE             DEVICE  SIZE/OFF     NODE NAME
+    #   perl5.18 57806 moejoe    3   PIPE 0xd52803906b02a64f     16384          ->0xd52803907288254f
+    for (`lsof -p $$`) {
+      / PIPE / or next;
+      my ($device, $name) = /\b(0x[[:xdigit:]]+)/g;
+      my $pipe = $LSOF_PIPE{$device} || $LSOF_PIPE{$name} || $device;
+      $LSOF_PIPE{$device} = $LSOF_PIPE{$name} = $pipe;
+      push @pipes, $pipe;
+    }
+  } else {
+    diag "unable to test leaky pipes";
   }
 
   return sort @pipes;
