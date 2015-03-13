@@ -1,5 +1,8 @@
 Revision history for Mojolicious-Plugin-CGI
 
+0.20     Fri Mar 13 08:27:48 2015
+       * t/post.t leaky pipes test works on osx (timgimyee)
+
 0.19     Sun Feb  8 14:24:43 2015
        * Will not test SERVER_ADMIN variable
 
