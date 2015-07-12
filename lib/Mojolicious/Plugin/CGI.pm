@@ -200,10 +200,9 @@ sub register {
       my $pid;
 
       $c->$before;
-      defined($pid = fork) or die "Failed to fork: $!";
+      defined($pid = fork) or die "[CGI] Could not fork $name: $!";
 
       unless ($pid) {
-        Mojo::IOLoop->reset;
         my @STDERR = @stderr ? ('>&', fileno $stderr[WRITE]) : ('>>', $self->{errlog});
         warn "[CGI:$name:$$] <<< (@{[$stdin->slurp]})\n" if DEBUG;
         %ENV = $self->emulate_environment($c);
