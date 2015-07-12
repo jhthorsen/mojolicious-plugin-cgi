@@ -2,7 +2,7 @@
 use ExtUtils::MakeMaker;
 WriteMakefile(
   NAME          => 'Mojolicious::Plugin::CGI',
-  AUTHOR        => 'Jan Henning Thorsen <jhthorsen@cpan.org>',
+  AUTHOR        => 'Lee Johnson <lee@givengain.ch>',
   LICENSE       => 'artistic_2',
   ABSTRACT_FROM => 'lib/Mojolicious/Plugin/CGI.pm',
   VERSION_FROM  => 'lib/Mojolicious/Plugin/CGI.pm',
@@ -16,5 +16,5 @@ WriteMakefile(
   },
   BUILD_REQUIRES => {'Test::More' => '0.88'},
   PREREQ_PM      => {'IO::Pipely' => '0.005', 'Mojolicious' => '5.08'},
-  test           => {TESTS        => 't/*.t'},
+  test           => {TESTS        => (-e 'META.yml' ? 't/*.t' : 't/*.t xt/*.t')},
 );
