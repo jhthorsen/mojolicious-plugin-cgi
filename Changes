@@ -2,6 +2,7 @@ Revision history for perl distribution Mojolicious-Plugin-CGI
 
 0.21 Not Released
  - Fix "Can't call method "write" on an undefined value" #16
+ - Disabled "no leaky leaks" test
 
 0.20 2015-03-13T08:27:48Z
  - t/post.t leaky pipes test works on osx (timgimyee)
