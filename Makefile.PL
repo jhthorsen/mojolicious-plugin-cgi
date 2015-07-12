@@ -2,7 +2,7 @@
 use ExtUtils::MakeMaker;
 WriteMakefile(
   NAME          => 'Mojolicious::Plugin::CGI',
-  AUTHOR        => 'Lee Johnson <lee@givengain.ch>',
+  AUTHOR        => 'Jan Henning Thorsen <jhthorsen@cpan.org>',
   LICENSE       => 'artistic_2',
   ABSTRACT_FROM => 'lib/Mojolicious/Plugin/CGI.pm',
   VERSION_FROM  => 'lib/Mojolicious/Plugin/CGI.pm',
