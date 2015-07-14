@@ -239,9 +239,10 @@ sub register {
         },
         sub {
           my ($delay) = @_;
+          my $GUARD = 50;
           warn "[CGI:$name:$pid] Child closed STDOUT\n" if DEBUG;
           unlink $stdin->path or die "Could not remove STDIN @{[$stdin->path]}" if -e $stdin->path;
-          _waitpids($pids);
+          _waitpids({$pid => $pids->{$pid}}) while $pids->{$pid} and kill 0, $pid and $GUARD--;
           $c->finish;
         },
       );
