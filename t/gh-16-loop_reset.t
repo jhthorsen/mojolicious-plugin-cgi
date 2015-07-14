@@ -32,7 +32,7 @@ my $port = Mojo::IOLoop::Server->generate_port;
 
 # assume morbo is in the same dir as the perl runing this test
 # this is not WIN32 compatible, and 5.14+, but since dev test only...
-my $prefix = $^X =~ s!/perl[^/]*$!!r;
+(my $prefix = $^X) =~ s!/perl[^/]*$!!;
 my $pid = open my $server, '-|', $^X, "$prefix/morbo", '-l', "http://127.0.0.1:$port", $script;
 sleep 1 until _server_running($port);
 

@@ -1,5 +1,8 @@
 Revision history for perl distribution Mojolicious-Plugin-CGI
 
+0.22 Not Released
+ - Fix "Bareword found where operator expected at t/gh-16-loop_reset.t line 35"
+
 0.21 2015-07-12T15:26:05+0200
  - Fix "Can't call method "write" on an undefined value" #16
  - Disabled "no leaky leaks" test
