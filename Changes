@@ -1,6 +1,6 @@
 Revision history for perl distribution Mojolicious-Plugin-CGI
 
-0.22 Not Released
+0.22 2015-07-14T17:32:59+0200
  - Fix "Bareword found where operator expected at t/gh-16-loop_reset.t line 35"
  - Try to fix waiting for finished CGI scripts
 
