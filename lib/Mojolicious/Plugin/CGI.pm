@@ -6,7 +6,7 @@ Mojolicious::Plugin::CGI - Run CGI script from Mojolicious
 
 =head1 VERSION
 
-0.22
+0.23
 
 =head1 DESCRIPTION
 
@@ -62,7 +62,7 @@ use constant DEBUG                => $ENV{MOJO_PLUGIN_CGI_DEBUG} || 0;
 use constant READ                 => 0;
 use constant WRITE                => 1;
 
-our $VERSION      = '0.22';
+our $VERSION      = '0.23';
 our %ORIGINAL_ENV = %ENV;
 
 =head1 ATTRIBUTES
@@ -313,7 +313,7 @@ sub _waitpids {
   for my $pid (keys %$pids) {
     local $SIG{CHLD} = 'DEFAULT';    # no idea why i need to do this, but it seems like waitpid() below return -1 if not
     local ($?, $!);
-    next unless $pid == waitpid $pid, WNOHANG;
+    next unless waitpid $pid, WNOHANG;
     my $name = delete $pids->{$pid} || 'unknown';
     my ($exit_value, $signal) = ($? >> 8, $? & 127);
     warn "[CGI:$name:$pid] Child exit_value=$exit_value ($signal)\n" if DEBUG;
