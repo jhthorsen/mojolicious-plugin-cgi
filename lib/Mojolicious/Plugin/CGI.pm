@@ -287,7 +287,8 @@ sub _stdout_cb {
       $c->res->parse($headers);
     }
     else {
-      $c->res->code($headers =~ /Location:/ ? 302 : 200);
+      $c->res->code($1) if $headers =~ /^Status: (\d\d\d)/m;
+      $c->res->code($headers =~ /Location:/ ? 302 : 200) unless $c->res->code;
       $c->res->parse($c->res->get_start_line_chunk(0) . $headers);
     }
     $c->write($buf) if length $buf;
