@@ -204,7 +204,6 @@ sub register {
       defined($pid = fork) or die "[CGI] Could not fork $name: $!";
 
       unless ($pid) {
-	Mojo::IOLoop->reset if $self->{run}; # clean up unless CGI script is started with exec()
         my @STDERR = @stderr ? ('>&', fileno $stderr[WRITE]) : ('>>', $self->{errlog});
         warn "[CGI:$name:$$] <<< (@{[$stdin->slurp]})\n" if DEBUG;
         %ENV = $self->emulate_environment($c);
@@ -216,6 +215,7 @@ sub register {
         select STDOUT;
         $| = 1;
 	if ($self->{run}) {
+	  Mojo::IOLoop->reset; # clean up
 	  $self->{run}->();
 	  exit;
 	} else {
