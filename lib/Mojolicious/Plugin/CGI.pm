@@ -288,8 +288,8 @@ sub _stdout_cb {
     $buf .= $chunk;
     $buf =~ s/^(.*?\x0a\x0d?\x0a\x0d?)//s or return;    # false until all headers has been read from the CGI script
     $headers = $1;
-    if ($headers =~ /^HTTP\/\d\.\d (\d\d\d)?/) {
-      $c->res->code($1) if $1;
+    if ($headers =~ /^HTTP/) {
+      $c->res->code($1) if $headers =~ m!^HTTP/\d\.\d (\d\d\d)!;
       $c->res->parse($headers);
     }
     else {
