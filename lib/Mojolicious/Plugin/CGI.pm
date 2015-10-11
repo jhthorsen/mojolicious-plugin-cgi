@@ -221,7 +221,7 @@ sub register {
 
         if (my $code = $self->{run}) {
           Mojo::IOLoop->reset;    # clean up
-          $code->();
+          $code->($c);
           exit;
         }
         else {
