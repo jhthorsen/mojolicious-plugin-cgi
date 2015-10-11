@@ -128,13 +128,13 @@ sub emulate_environment {
     %{$self->env},
     CONTENT_LENGTH => $content_length        || 0,
     CONTENT_TYPE   => $headers->content_type || '',
-    GATEWAY_INTERFACE => 'CGI/1.1',
-    HTTP_COOKIE       => $headers->cookie || '',
-    HTTP_HOST         => $headers->host || '',
-    HTTP_REFERER      => $headers->referrer || '',
-    HTTP_USER_AGENT   => $headers->user_agent || '',
-    HTTP_IF_NONE_MATCH=> $headers->if_none_match || '',
-    HTTPS             => $req->is_secure ? 'YES' : 'NO',
+    GATEWAY_INTERFACE  => 'CGI/1.1',
+    HTTP_COOKIE        => $headers->cookie || '',
+    HTTP_HOST          => $headers->host || '',
+    HTTP_REFERER       => $headers->referrer || '',
+    HTTP_USER_AGENT    => $headers->user_agent || '',
+    HTTP_IF_NONE_MATCH => $headers->if_none_match || '',
+    HTTPS              => $req->is_secure ? 'YES' : 'NO',
 
     #PATH => $req->url->path,
     PATH_INFO => '/' . ($c->stash('path_info') || ''),
@@ -177,7 +177,11 @@ sub register {
     $self->{script} = shift @$args;
   }
   elsif ($args->{support_semicolon_in_query_string}) {
-    $app->hook(before_dispatch => sub { $_[0]->stash('cgi.query_string' => $_[0]->req->url->query->to_string); });
+    $app->hook(
+      before_dispatch => sub {
+        $_[0]->stash('cgi.query_string' => $_[0]->req->url->query->to_string);
+      }
+    );
     return;
   }
   else {
@@ -214,14 +218,16 @@ sub register {
         $| = 1;
         select STDOUT;
         $| = 1;
-	if ($self->{run}) {
-	  Mojo::IOLoop->reset; # clean up
-	  $self->{run}->();
-	  exit;
-	} else {
-	  { exec $self->{script} }
-	  die "Could not execute $self->{script}: $!";
-	}
+
+        if ($self->{run}) {
+          Mojo::IOLoop->reset;    # clean up
+          $self->{run}->();
+          exit;
+        }
+        else {
+          { exec $self->{script} }
+          die "Could not execute $self->{script}: $!";
+        }
       }
       $log->debug("[CGI:$name:$pid] START $self->{script}");
       $pids->{$pid} = $name;
