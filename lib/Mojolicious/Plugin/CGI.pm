@@ -219,9 +219,9 @@ sub register {
         select STDOUT;
         $| = 1;
 
-        if ($self->{run}) {
+        if (my $code = $self->{run}) {
           Mojo::IOLoop->reset;    # clean up
-          $self->{run}->();
+          $code->();
           exit;
         }
         else {
