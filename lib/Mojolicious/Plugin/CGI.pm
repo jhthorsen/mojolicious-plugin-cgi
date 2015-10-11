@@ -289,7 +289,7 @@ sub _stdout_cb {
     $buf =~ s/^(.*?\x0a\x0d?\x0a\x0d?)//s or return;    # false until all headers has been read from the CGI script
     $headers = $1;
     if ($headers =~ /^HTTP/) {
-      $c->res->code($1) if $headers =~ m!^HTTP/\d\.\d (\d\d\d)!;
+      $c->res->code($1) if $headers =~ m!^HTTP (\d\d\d)!;    # borked CGI response if SERVER_PROTOCOL has no version
       $c->res->parse($headers);
     }
     else {
