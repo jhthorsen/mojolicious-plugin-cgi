@@ -133,6 +133,7 @@ sub emulate_environment {
     HTTP_HOST         => $headers->host || '',
     HTTP_REFERER      => $headers->referrer || '',
     HTTP_USER_AGENT   => $headers->user_agent || '',
+    HTTP_IF_NONE_MATCH=> $headers->if_none_match || '',
     HTTPS             => $req->is_secure ? 'YES' : 'NO',
 
     #PATH => $req->url->path,
