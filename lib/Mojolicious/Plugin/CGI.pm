@@ -281,15 +281,14 @@ sub _stdout_cb {
     $buf .= $chunk;
     $buf =~ s/^(.*?\x0a\x0d?\x0a\x0d?)//s or return;    # false until all headers has been read from the CGI script
     $headers = $1;
-
-    if ($headers =~ /^HTTP/) {
+    if ($headers =~ /^HTTP(?: (\d\d\d))?/) {
+      $c->res->code($1) if $1;
       $c->res->parse($headers);
     }
     else {
       $c->res->code($headers =~ /Location:/ ? 302 : 200);
       $c->res->parse($c->res->get_start_line_chunk(0) . $headers);
     }
-
     $c->write($buf) if length $buf;
   };
 }
