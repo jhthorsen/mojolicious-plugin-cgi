@@ -18,10 +18,9 @@ $t->post_ok('/postman', {}, "some\ndata\n")->status_is(200)->content_like(qr{^\d
 
 my $pid = $t->tx->res->body =~ /(\d+)/ ? $1 : 0;
 
-diag $pid;
-
 if ($pid) {
-  ok !(kill 0, $pid), 'child is taken care of';
+  ok !(kill 0, $pid), "child $pid is taken care of ($$, @{[time]})"
+    or is waitpid($pid, 0), $pid, "waitpid $pid, 0 ($$, @{[time]})";
 }
 else {
   ok 0, 'could not get pid from cgi output';

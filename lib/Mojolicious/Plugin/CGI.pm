@@ -19,32 +19,59 @@ manner.
 =head2 Standard usage
 
   use Mojolicious::Lite;
+  plugin CGI => [ "/cgi-bin/script" => "/path/to/cgi/script.pl" ];
 
-  plugin CGI => [ '/script' => '/path/to/cgi/script.pl' ];
+Using the code above is enough to run C<script.pl> when accessing
+L<http://localhost:3000/cgi-bin/script>.
+
+=head2 Complex usage
+
   plugin CGI => {
-    route => '/mount/point',
-    script => '/path/to/cgi/script.pl',
+    # Specify the script and mount point
+    script => "/path/to/cgi/script.pl",
+    route  => "/some/route",
+
+    # %ENV variables visible from inside the CGI script
     env => {}, # default is \%ENV
-    errlog => '/path/to/file.log', # path to where STDERR from cgi script goes
-    before => sub { # called before setup and script start
+
+    # Path to where STDERR from cgi script goes
+    errlog => "/path/to/file.log",
+
+    # The "before" hook is called before script start
+    # It receives a Mojolicious::Controller which can be modified
+    before => sub {
       my $c = shift;
-      # modify QUERY_STRING
       $c->req->url->query->param(a => 123);
     },
   };
 
-  app->start;
+The above contains all the options you can pass on to the plugin.
+
+=head2 Running code refs
+
+  plugin CGI => {
+    route => "/some/path",
+    run   => sub {
+      my $cgi = CGI->new;
+      # ...
+    }
+  };
+
+Instead of calling a script, you can run a code block when accessing the route.
+This is (pretty much) safe, even if the code block modifies global state,
+since it runs in a separate fork/process.
 
 =head2 Support for semicolon in query string
 
-  plugin CGI => { support_semicolon_in_query_string => 1 };
+  plugin CGI => {
+    support_semicolon_in_query_string => 1,
+    ...
+  };
 
 The code above need to be added before other plugins or handler which use
 L<Mojo::Message::Request/url>. It will inject a C<before_dispatch>
 hook which saves the original QUERY_STRING, before it is split on
 "&" in L<Mojo::Parameters>.
-
-This is an EXPERIMENTAL feature.
 
 =cut
 
@@ -93,10 +120,10 @@ by the CGI script.
 
 In addition to L</env>, these dynamic variables are set:
 
-  CONTENT_LENGTH, CONTENT_TYPE, HTTP_COOKIE, HTTP_HOST, HTTP_REFERER,
-  HTTP_USER_AGENT, HTTPS, PATH, PATH_INFO, QUERY_STRING, REMOTE_ADDR,
-  REMOTE_HOST, REMOTE_PORT, REMOTE_USER, REQUEST_METHOD, SCRIPT_NAME,
-  SERVER_PORT, SERVER_PROTOCOL.
+  CONTENT_LENGTH, CONTENT_TYPE, HTTP_COOKIE, HTTP_HOST, HTTP_IF_NONE_MATCH,
+  HTTP_REFERER, HTTP_USER_AGENT, HTTPS, PATH, PATH_INFO, QUERY_STRING,
+  REMOTE_ADDR, REMOTE_HOST, REMOTE_PORT, REMOTE_USER, REQUEST_METHOD,
+  SCRIPT_NAME, SERVER_PORT, SERVER_PROTOCOL.
 
 Additional static variables:
 
