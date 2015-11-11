@@ -128,12 +128,13 @@ sub emulate_environment {
     %{$self->env},
     CONTENT_LENGTH => $content_length        || 0,
     CONTENT_TYPE   => $headers->content_type || '',
-    GATEWAY_INTERFACE => 'CGI/1.1',
-    HTTP_COOKIE       => $headers->cookie || '',
-    HTTP_HOST         => $headers->host || '',
-    HTTP_REFERER      => $headers->referrer || '',
-    HTTP_USER_AGENT   => $headers->user_agent || '',
-    HTTPS             => $req->is_secure ? 'YES' : 'NO',
+    GATEWAY_INTERFACE  => 'CGI/1.1',
+    HTTP_COOKIE        => $headers->cookie || '',
+    HTTP_HOST          => $headers->host || '',
+    HTTP_REFERER       => $headers->referrer || '',
+    HTTP_USER_AGENT    => $headers->user_agent || '',
+    HTTP_IF_NONE_MATCH => $headers->if_none_match || '',
+    HTTPS              => $req->is_secure ? 'YES' : 'NO',
 
     #PATH => $req->url->path,
     PATH_INFO => '/' . ($c->stash('path_info') || ''),
@@ -176,7 +177,11 @@ sub register {
     $self->{script} = shift @$args;
   }
   elsif ($args->{support_semicolon_in_query_string}) {
-    $app->hook(before_dispatch => sub { $_[0]->stash('cgi.query_string' => $_[0]->req->url->query->to_string); });
+    $app->hook(
+      before_dispatch => sub {
+        $_[0]->stash('cgi.query_string' => $_[0]->req->url->query->to_string);
+      }
+    );
     return;
   }
   else {
@@ -203,8 +208,6 @@ sub register {
       defined($pid = fork) or die "[CGI] Could not fork $name: $!";
 
       unless ($pid) {
-
-        # No need to Mojo::IOLoop->reset, since the CGI script is started with exec()
         my @STDERR = @stderr ? ('>&', fileno $stderr[WRITE]) : ('>>', $self->{errlog});
         warn "[CGI:$name:$$] <<< (@{[$stdin->slurp]})\n" if DEBUG;
         %ENV = $self->emulate_environment($c);
@@ -215,10 +218,17 @@ sub register {
         $| = 1;
         select STDOUT;
         $| = 1;
-        { exec $self->{script} }
-        die "Could not execute $self->{script}: $!";
-      }
 
+        if (my $code = $self->{run}) {
+          Mojo::IOLoop->reset;    # clean up
+          $code->($c);
+          exit;
+        }
+        else {
+          { exec $self->{script} }
+          die "Could not execute $self->{script}: $!";
+        }
+      }
       $log->debug("[CGI:$name:$pid] START $self->{script}");
       $pids->{$pid} = $name;
 
@@ -278,15 +288,15 @@ sub _stdout_cb {
     $buf .= $chunk;
     $buf =~ s/^(.*?\x0a\x0d?\x0a\x0d?)//s or return;    # false until all headers has been read from the CGI script
     $headers = $1;
-
     if ($headers =~ /^HTTP/) {
+      $c->res->code($1) if $headers =~ m!^HTTP (\d\d\d)!;    # borked CGI response if SERVER_PROTOCOL has no version
       $c->res->parse($headers);
     }
     else {
-      $c->res->code($headers =~ /Location:/ ? 302 : 200);
+      $c->res->code($1) if $headers =~ /^Status: (\d\d\d)/m;
+      $c->res->code($headers =~ /Location:/ ? 302 : 200) unless $c->res->code;
       $c->res->parse($c->res->get_start_line_chunk(0) . $headers);
     }
-
     $c->write($buf) if length $buf;
   };
 }
