@@ -1,6 +1,6 @@
 Revision history for perl distribution Mojolicious-Plugin-CGI
 
-0.25 Not Released
+0.25 2015-11-27T11:49:54+0100
  - Made post.t optional
 
 0.24 2015-11-11T22:16:33+0100
