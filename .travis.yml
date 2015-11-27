@@ -4,9 +4,9 @@ perl:
   - "5.14"
   - "5.10"
 env:
-  - "HARNESS_OPTIONS=j1 TEST_POD=1"
+  - "HARNESS_OPTIONS=j1 TEST_POD=1 TEST_MORBO=1 TEST_PIPES=1"
 install:
-  - "cpanm -n Test::Pod Test::Pod::Coverage"
+  - "cpanm -n Test::Pod Test::Pod::Coverage Parallel::ForkManager"
   - "cpanm -n --installdeps ."
 notifications:
   email: false

@@ -1,5 +1,8 @@
 Revision history for perl distribution Mojolicious-Plugin-CGI
 
+0.25 Not Released
+ - Made post.t optional
+
 0.24 2015-11-11T22:16:33+0100
  - Add "run" option for running CGI code from a callback instead of script #17
  - Add HTTP_IF_NONE_MATCH to environement #17
