@@ -1,5 +1,8 @@
 Revision history for perl distribution Mojolicious-Plugin-CGI
 
+0.26 Not Released
+ - Expose all headers as environment variables #18
+
 0.25 2015-11-27T11:49:54+0100
  - Made post.t optional
 

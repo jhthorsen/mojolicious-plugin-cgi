@@ -120,8 +120,7 @@ by the CGI script.
 
 In addition to L</env>, these dynamic variables are set:
 
-  CONTENT_LENGTH, CONTENT_TYPE, HTTP_COOKIE, HTTP_HOST, HTTP_IF_NONE_MATCH,
-  HTTP_REFERER, HTTP_USER_AGENT, HTTPS, PATH, PATH_INFO, QUERY_STRING,
+  CONTENT_LENGTH, CONTENT_TYPE, HTTPS, PATH, PATH_INFO, QUERY_STRING,
   REMOTE_ADDR, REMOTE_HOST, REMOTE_PORT, REMOTE_USER, REQUEST_METHOD,
   SCRIPT_NAME, SERVER_PORT, SERVER_PROTOCOL.
 
@@ -133,6 +132,16 @@ Additional static variables:
   SERVER_NAME = Sys::Hostname::hostname()
   SERVER_SOFTWARE = "Mojolicious::Plugin::CGI"
 
+Plus all headers are exposed. Examples:
+
+  .----------------------------------------.
+  | Header          | Variable             |
+  |-----------------|----------------------|
+  | Referer         | HTTP_REFERER         |
+  | User-Agent      | HTTP_USER_AGENT      |
+  | X-Forwarded-For | HTTP_X_FORWARDED_FOR |
+  '----------------------------------------'
+
 =cut
 
 sub emulate_environment {
@@ -142,6 +151,13 @@ sub emulate_environment {
   my $headers        = $req->headers;
   my $content_length = $req->content->is_multipart ? $req->body_size : $headers->content_length;
   my $remote_user    = '';
+  my %env_headers    = (HTTP_COOKIE => '', HTTP_REFERER => '');
+
+  for my $name (@{$headers->names}) {
+    my $key = uc "http_$name";
+    $key =~ s!\W!_!g;
+    $env_headers{$key} = $headers->header($name);
+  }
 
   if (my $userinfo = $c->req->url->to_abs->userinfo) {
     $remote_user = $userinfo =~ /([^:]+)/ ? $1 : '';
@@ -155,15 +171,9 @@ sub emulate_environment {
     %{$self->env},
     CONTENT_LENGTH => $content_length        || 0,
     CONTENT_TYPE   => $headers->content_type || '',
-    GATEWAY_INTERFACE  => 'CGI/1.1',
-    HTTP_COOKIE        => $headers->cookie || '',
-    HTTP_HOST          => $headers->host || '',
-    HTTP_REFERER       => $headers->referrer || '',
-    HTTP_USER_AGENT    => $headers->user_agent || '',
-    HTTP_IF_NONE_MATCH => $headers->if_none_match || '',
-    HTTPS              => $req->is_secure ? 'YES' : 'NO',
-
-    #PATH => $req->url->path,
+    GATEWAY_INTERFACE => 'CGI/1.1',
+    HTTPS             => $req->is_secure ? 'YES' : 'NO',
+    %env_headers,
     PATH_INFO => '/' . ($c->stash('path_info') || ''),
     QUERY_STRING => $c->stash('cgi.query_string') || $req->url->query->to_string,
     REMOTE_ADDR => $tx->remote_address,

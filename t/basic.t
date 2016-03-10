@@ -34,4 +34,8 @@ $t->get_ok($t->tx->req->url->clone->path('/env/basic/foo')->query(query => 123))
   ->content_like(qr{^SERVER_PROTOCOL=HTTP}m,                     'SERVER_PROTOCOL=HTTP')
   ->content_like(qr{^SERVER_SOFTWARE=Mojolicious::Plugin::CGI}m, 'SERVER_SOFTWARE=Mojolicious::Plugin::CGI');
 
+$t->get_ok('/env/basic/foo' => {'Referer' => 'http://thorsen.pm', 'X-Forwarded-For' => '1.2.3.4'})->status_is(200)
+  ->content_like(qr{^HTTP_REFERER=http://thorsen\.pm}m, 'HTTP_REFERER=http://thorsen.pm')
+  ->content_like(qr{^HTTP_X_FORWARDED_FOR=1\.2\.3\.4}m, 'HTTP_X_FORWARDED_FOR=1.2.3.4');
+
 done_testing;
