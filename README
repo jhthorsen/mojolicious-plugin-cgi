@@ -2,7 +2,7 @@ NAME
     Mojolicious::Plugin::CGI - Run CGI script from Mojolicious
 
 VERSION
-    0.25
+    0.26
 
 DESCRIPTION
     This plugin enable Mojolicious to run Perl CGI scripts. It does so by
@@ -81,8 +81,7 @@ METHODS
 
     In addition to "env", these dynamic variables are set:
 
-      CONTENT_LENGTH, CONTENT_TYPE, HTTP_COOKIE, HTTP_HOST, HTTP_IF_NONE_MATCH,
-      HTTP_REFERER, HTTP_USER_AGENT, HTTPS, PATH, PATH_INFO, QUERY_STRING,
+      CONTENT_LENGTH, CONTENT_TYPE, HTTPS, PATH, PATH_INFO, QUERY_STRING,
       REMOTE_ADDR, REMOTE_HOST, REMOTE_PORT, REMOTE_USER, REQUEST_METHOD,
       SCRIPT_NAME, SERVER_PORT, SERVER_PROTOCOL.
 
@@ -93,6 +92,16 @@ METHODS
       SCRIPT_FILENAME = Script name given as argument to register.
       SERVER_NAME = Sys::Hostname::hostname()
       SERVER_SOFTWARE = "Mojolicious::Plugin::CGI"
+
+    Plus all headers are exposed. Examples:
+
+      .----------------------------------------.
+      | Header          | Variable             |
+      |-----------------|----------------------|
+      | Referer         | HTTP_REFERER         |
+      | User-Agent      | HTTP_USER_AGENT      |
+      | X-Forwarded-For | HTTP_X_FORWARDED_FOR |
+      '----------------------------------------'
 
   register
       $self->register($app, [ $route => $script ]);

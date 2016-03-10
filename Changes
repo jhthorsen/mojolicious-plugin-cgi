@@ -1,6 +1,6 @@
 Revision history for perl distribution Mojolicious-Plugin-CGI
 
-0.26 Not Released
+0.26 2016-03-10T22:15:51+0100
  - Expose all headers as environment variables #18
 
 0.25 2015-11-27T11:49:54+0100
