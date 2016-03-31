@@ -1,26 +1,80 @@
 package Mojolicious::Plugin::CGI;
 use Mojo::Base 'Mojolicious::Plugin';
+
 use Mojo::Util 'b64_decode';
 use File::Basename;
 use File::Spec;
 use Sys::Hostname;
 use IO::Pipely 'pipely';
 use POSIX 'WNOHANG';
-use Socket qw( AF_INET inet_aton );
-use constant CHUNK_SIZE           => 131072;
+use Perl::OSType 'is_os_type';
+use Socket qw(AF_INET inet_aton);
 use constant CHECK_CHILD_INTERVAL => $ENV{CHECK_CHILD_INTERVAL} || 0.01;
-use constant DEBUG                => $ENV{MOJO_PLUGIN_CGI_DEBUG} || 0;
+use constant DEBUG                => $ENV{MOJO_PLUGIN_CGI_DEBUG};
+use constant IS_WINDOWS           => is_os_type('Windows');
 use constant READ                 => 0;
 use constant WRITE                => 1;
 
 our $VERSION      = '0.26';
 our %ORIGINAL_ENV = %ENV;
 
-has env    => sub { +{%ORIGINAL_ENV} };
-has ioloop => sub { Mojo::IOLoop->singleton };
+has env => sub { +{%ORIGINAL_ENV} };
 
-sub emulate_environment {
-  my ($self, $c) = @_;
+sub register {
+  my ($self, $app, $args) = @_;
+  my $pids = $app->{'mojolicious_plugin_cgi.pids'} ||= {};
+
+  $args = {route => shift @$args, script => shift @$args} if ref $args eq 'ARRAY';
+  $args->{run} = delete $args->{script} if ref $args->{script} eq 'CODE';
+  $args->{pids} = $pids;
+
+  $app->helper('cgi.run' => sub { _run($args, @_) }) unless $app->renderer->helpers->{'cgi.run'};
+  $app->{'mojolicious_plugin_cgi.tid'}
+    ||= Mojo::IOLoop->recurring(CHECK_CHILD_INTERVAL, sub { _waitpids($pids); });
+
+  if ($args->{support_semicolon_in_query_string}
+    and !$app->{'mojolicious_plugin_cgi.before_dispatch'}++)
+  {
+    $app->hook(
+      before_dispatch => sub {
+        $_[0]->stash('cgi.query_string' => $_[0]->req->url->query->to_string);
+      }
+    );
+  }
+
+  return unless $args->{route};    # just register the helper
+  die "Neither 'run', nor 'script' is specified." unless $args->{run} or $args->{script};
+  $args->{route} = $app->routes->any("$args->{route}/*path_info", {path_info => ''})
+    unless ref $args->{route};
+  $args->{script} = File::Spec->rel2abs($args->{script}) || $args->{script} if $args->{script};
+  $args->{route}->to(cb => sub { _run($args, @_) });
+}
+
+sub _child {
+  my ($c, $args, $stdin, $stdout, $stderr) = @_;
+  my @STDERR = @$stderr ? ('>&', fileno $stderr->[WRITE]) : ('>>', $args->{errlog});
+
+  Mojo::IOLoop->reset;
+  warn "[CGI:$args->{name}:$$] <<< (@{[$stdin->slurp]})\n" if DEBUG;
+  %ENV = _emulate_environment($c, $args);
+  open STDIN, '<', $stdin->path or die "STDIN @{[$stdin->path]}: $!" if -s $stdin->path;
+  open STDERR, $STDERR[0], $STDERR[1] or die "STDERR: @$stderr: $!";
+  open STDOUT, '>&', fileno $stdout->[WRITE] or die "STDOUT: $!";
+  select STDERR;
+  $| = 1;
+  select STDOUT;
+  $| = 1;
+
+  $args->{run} ? $args->{run}->($c) : exec $args->{script}
+    || die "Could not execute $args->{script}: $!";
+
+  eval { POSIX::_exit($!) } unless IS_WINDOWS;
+  eval { CORE::kill KILL => $$ };
+  exit $!;
+}
+
+sub _emulate_environment {
+  my ($c, $args) = @_;
   my $tx             = $c->tx;
   my $req            = $tx->req;
   my $headers        = $req->headers;
@@ -42,8 +96,15 @@ sub emulate_environment {
     $remote_user = $remote_user =~ /([^:]+)/       ? $1            : '';
   }
 
+  my $script_name
+    = $args->{route}
+    ? $c->url_for($args->{route}->name, {path_info => ''})->path->to_string
+    : $c->req->url->path->to_string;
+
+  $script_name =~ s!\Q$args->{script_name}\E.*!$args->{script_name}! if $args->{script_name};
+
   return (
-    %{$self->env},
+    %{$args->{env} || {}},
     CONTENT_LENGTH => $content_length        || 0,
     CONTENT_TYPE   => $headers->content_type || '',
     GATEWAY_INTERFACE => 'CGI/1.1',
@@ -56,112 +117,67 @@ sub emulate_environment {
     REMOTE_PORT => $tx->remote_port,
     REMOTE_USER => $remote_user,
     REQUEST_METHOD  => $req->method,
-    SCRIPT_FILENAME => $self->{script},
-    SCRIPT_NAME     => $c->url_for($self->{route}->name, {path_info => ''})->path->to_string,
-    SERVER_ADMIN => $ENV{USER} || '',
-    SERVER_NAME  => hostname,
-    SERVER_PORT  => $tx->local_port,
+    SCRIPT_FILENAME => $args->{script} || '',
+    SCRIPT_NAME     => $script_name,
+    SERVER_ADMIN    => $ENV{USER} || '',
+    SERVER_NAME     => hostname,
+    SERVER_PORT     => $tx->local_port,
     SERVER_PROTOCOL => $req->is_secure ? 'HTTPS' : 'HTTP',    # TODO: Version is missing
     SERVER_SOFTWARE => __PACKAGE__,
   );
 }
 
-sub register {
-  my ($self, $app, $args) = @_;
-  my $pids = $app->defaults->{'mojolicious_plugin_cgi.pids'} ||= {};
-  my ($before, $name);
+sub _run {
+  my ($defaults, $c) = (shift, shift);
+  my $args = @_ ? @_ > 1 ? {@_} : {%{$_[0]}} : {};
+  my $before = $args->{before} || $defaults->{before};
+  my $stdin  = _stdin($c);
+  my @stdout = pipely;
+  my ($pid, $log_key, @stderr);
 
-  if (ref $args eq 'ARRAY') {
-    $self->{route}  = shift @$args;
-    $self->{script} = shift @$args;
+  $args->{$_} ||= $defaults->{$_} for qw(errlog route run script);
+  $args->{name} = $args->{run} ? "$args->{run}" : basename $args->{script};
+  $c->$before($args) if $before;
+  @stderr = (pipely) unless $args->{errlog};
+  defined($pid = fork) or die "[CGI:$args->{name}] fork failed: $!";
+  _child($c, $args, $stdin, \@stdout, \@stderr) unless $pid;
+  $args->{pids}{$pid} = $args->{name};
+  $log_key = "CGI:$args->{name}:$pid";
+  $c->app->log->debug("[$log_key] START @{[$args->{script} || $args->{run}]}");
+
+  for my $p (\@stdout, \@stderr) {
+    next unless $p->[READ];
+    close $p->[WRITE];
+    $p->[READ] = Mojo::IOLoop::Stream->new($p->[READ])->timeout(0);
+    Mojo::IOLoop->stream($p->[READ]);
   }
-  elsif ($args->{support_semicolon_in_query_string}) {
-    $app->hook(
-      before_dispatch => sub {
-        $_[0]->stash('cgi.query_string' => $_[0]->req->url->query->to_string);
-      }
-    );
-    return;
-  }
-  else {
-    $self->{$_} ||= $args->{$_} for keys %$args;
-  }
 
-  $before = $self->{before} || sub { };
-  $app->defaults->{'mojolicious_plugin_cgi.tid'}
-    ||= $self->ioloop->recurring(CHECK_CHILD_INTERVAL, sub { _waitpids($pids); });
-
-  $name = basename $self->{script};
-  $self->{script} = File::Spec->rel2abs($self->{script}) || $self->{script};
-  $self->{route} = $app->routes->any("$self->{route}/*path_info", {path_info => ''})
-    unless ref $self->{route};
-  $self->{route}->to(
-    cb => sub {
-      my $c      = shift;
-      my $log    = $c->app->log;
-      my @stderr = $self->{errlog} ? () : pipely;
-      my @stdout = pipely;
-      my $stdin  = $self->_stdin($c);
-      my $pid;
-
-      $c->$before;
-      defined($pid = fork) or die "[CGI] Could not fork $name: $!";
-
-      unless ($pid) {
-        my @STDERR = @stderr ? ('>&', fileno $stderr[WRITE]) : ('>>', $self->{errlog});
-        warn "[CGI:$name:$$] <<< (@{[$stdin->slurp]})\n" if DEBUG;
-        %ENV = $self->emulate_environment($c);
-        open STDIN, '<', $stdin->path or die "STDIN @{[$stdin->path]}: $!" if -s $stdin->path;
-        open STDERR, $STDERR[0], $STDERR[1] or die "STDERR: @stderr: $!";
-        open STDOUT, '>&', fileno $stdout[WRITE] or die "STDOUT: $!";
-        select STDERR;
-        $| = 1;
-        select STDOUT;
-        $| = 1;
-
-        if (my $code = $self->{run}) {
-          Mojo::IOLoop->reset;    # clean up
-          $code->($c);
-          exit;
-        }
-        else {
-          { exec $self->{script} }
-          die "Could not execute $self->{script}: $!";
-        }
-      }
-      $log->debug("[CGI:$name:$pid] START $self->{script}");
-      $pids->{$pid} = $name;
-
-      for my $p (\@stdout, \@stderr) {
-        next unless $p->[READ];
-        close $p->[WRITE];
-        $p->[READ] = Mojo::IOLoop::Stream->new($p->[READ])->timeout(0);
-        $self->ioloop->stream($p->[READ]);
-      }
-
-      $c->delay(
-        sub {
-          my ($delay) = @_;
-          $c->stash('cgi.pid' => $pid, 'cgi.stdin' => $stdin);
-          $stderr[READ]->on(read => $self->_stderr_cb($log, "CGI:$name:$pid")) if $stderr[READ];
-          $stdout[READ]->on(read => $self->_stdout_cb($c, "CGI:$name:$pid"));
-          $stdout[READ]->on(close => $delay->begin);
-        },
-        sub {
-          my ($delay) = @_;
-          my $GUARD = 50;
-          warn "[CGI:$name:$pid] Child closed STDOUT\n" if DEBUG;
-          unlink $stdin->path or die "Could not remove STDIN @{[$stdin->path]}" if -e $stdin->path;
-          _waitpids({$pid => $pids->{$pid}}) while $pids->{$pid} and kill 0, $pid and $GUARD--;
-          $c->finish;
-        },
-      );
-    }
+  $c->delay(
+    sub {
+      my ($delay) = @_;
+      $c->stash('cgi.pid' => $pid, 'cgi.stdin' => $stdin);
+      $stderr[READ]->on(read => _stderr_cb($c, $log_key)) if $stderr[READ];
+      $stdout[READ]->on(read => _stdout_cb($c, $log_key));
+      $stdout[READ]->on(close => $delay->begin);
+    },
+    sub {
+      my ($delay) = @_;
+      my $GUARD = 50;
+      warn "[CGI:$args->{name}:$pid] Child closed STDOUT\n" if DEBUG;
+      unlink $stdin->path or die "Could not remove STDIN @{[$stdin->path]}" if -e $stdin->path;
+      _waitpids({$pid => $args->{pids}{$pid}})
+        while $args->{pids}{$pid}
+        and kill 0, $pid
+        and $GUARD--;
+      return $c->finish if $c->res->code;
+      return $c->render(text => "Could not run CGI script.\n", status => 500);
+    },
   );
 }
 
 sub _stderr_cb {
-  my ($self, $log, $log_key) = @_;
+  my ($c, $log_key) = @_;
+  my $log = $c->app->log;
   my $buf = '';
 
   return sub {
@@ -173,7 +189,7 @@ sub _stderr_cb {
 }
 
 sub _stdout_cb {
-  my ($self, $c, $log_key) = @_;
+  my ($c, $log_key) = @_;
   my $buf = '';
   my $headers;
 
@@ -181,17 +197,17 @@ sub _stdout_cb {
     my ($stream, $chunk) = @_;
     warn "[$log_key] >>> ($chunk)\n" if DEBUG;
 
-    if ($headers) {    # true if HTTP header has been written to client
-      return $c->write($chunk);
-    }
+    # true if HTTP header has been written to client
+    return $c->write($chunk) if $headers;
 
     $buf .= $chunk;
-    $buf =~ s/^(.*?\x0a\x0d?\x0a\x0d?)//s
-      or return;       # false until all headers has been read from the CGI script
+
+    # false until all headers has been read from the CGI script
+    $buf =~ s/^(.*?\x0a\x0d?\x0a\x0d?)//s or return;
     $headers = $1;
+
     if ($headers =~ /^HTTP/) {
-      $c->res->code($1)
-        if $headers =~ m!^HTTP (\d\d\d)!;    # borked CGI response if SERVER_PROTOCOL has no version
+      $c->res->code($1) if $headers =~ m!^HTTP (\d\d\d)!;
       $c->res->parse($headers);
     }
     else {
@@ -204,7 +220,7 @@ sub _stdout_cb {
 }
 
 sub _stdin {
-  my ($self, $c) = @_;
+  my $c = shift;
   my $stdin;
 
   if ($c->req->content->is_multipart) {
@@ -223,8 +239,9 @@ sub _waitpids {
   my $pids = shift;
 
   for my $pid (keys %$pids) {
-    local $SIG{CHLD} = 'DEFAULT'
-      ;    # no idea why i need to do this, but it seems like waitpid() below return -1 if not
+
+    # no idea why i need to do this, but it seems like waitpid() below return -1 if not
+    local $SIG{CHLD} = 'DEFAULT';
     local ($?, $!);
     next unless waitpid $pid, WNOHANG;
     my $name = delete $pids->{$pid} || 'unknown';
@@ -284,6 +301,25 @@ L<http://localhost:3000/cgi-bin/script>.
 
 The above contains all the options you can pass on to the plugin.
 
+=head2 Helper
+
+  plugin "CGI";
+
+  # GET /cgi-bin/some-script.cgi/path/info?x=123
+  get "/cgi-bin/#name/*path_info" => {path_info => ''}, sub {
+    my $c    = shift;
+    my $name = $c->stash("name");
+    $c->cgi->run({
+      script      => File::Spec->rel2abs("/path/to/cgi/$name"),
+      script_name => $name, # required to set correct SCRIPT_NAME
+    });
+  };
+
+The helper can take most the arguments that L</register> takes, with
+the exception of C<support_semicolon_in_query_string>.
+
+Note that the helper is registered in all of the examples.
+
 =head2 Running code refs
 
   plugin CGI => {
@@ -318,20 +354,9 @@ Holds a hash ref containing the environment variables that should be
 used when starting the CGI script. Defaults to C<%ENV> when this module
 was loaded.
 
-=head2 ioloop
-
-Holds a L<Mojo::IOLoop> object.
-
-=head1 METHODS
-
-=head2 emulate_environment
-
-  %env = $self->emulate_environment($c);
-
-Returns a hash which contains the environment variables which should be used
-by the CGI script.
-
-In addition to L</env>, these dynamic variables are set:
+This plugin will create a set of environment variables depenendent on the
+request passed in which is according to the CGI spec. In addition to L</env>,
+these dynamic variables are set:
 
   CONTENT_LENGTH, CONTENT_TYPE, HTTPS, PATH, PATH_INFO, QUERY_STRING,
   REMOTE_ADDR, REMOTE_HOST, REMOTE_PORT, REMOTE_USER, REQUEST_METHOD,
