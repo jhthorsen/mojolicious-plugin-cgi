@@ -1,80 +1,4 @@
 package Mojolicious::Plugin::CGI;
-
-=head1 NAME
-
-Mojolicious::Plugin::CGI - Run CGI script from Mojolicious
-
-=head1 VERSION
-
-0.26
-
-=head1 DESCRIPTION
-
-This plugin enable L<Mojolicious> to run Perl CGI scripts. It does so by forking
-a new process with a modified environment and reads the STDOUT in a non-blocking
-manner.
-
-=head1 SYNOPSIS
-
-=head2 Standard usage
-
-  use Mojolicious::Lite;
-  plugin CGI => [ "/cgi-bin/script" => "/path/to/cgi/script.pl" ];
-
-Using the code above is enough to run C<script.pl> when accessing
-L<http://localhost:3000/cgi-bin/script>.
-
-=head2 Complex usage
-
-  plugin CGI => {
-    # Specify the script and mount point
-    script => "/path/to/cgi/script.pl",
-    route  => "/some/route",
-
-    # %ENV variables visible from inside the CGI script
-    env => {}, # default is \%ENV
-
-    # Path to where STDERR from cgi script goes
-    errlog => "/path/to/file.log",
-
-    # The "before" hook is called before script start
-    # It receives a Mojolicious::Controller which can be modified
-    before => sub {
-      my $c = shift;
-      $c->req->url->query->param(a => 123);
-    },
-  };
-
-The above contains all the options you can pass on to the plugin.
-
-=head2 Running code refs
-
-  plugin CGI => {
-    route => "/some/path",
-    run   => sub {
-      my $cgi = CGI->new;
-      # ...
-    }
-  };
-
-Instead of calling a script, you can run a code block when accessing the route.
-This is (pretty much) safe, even if the code block modifies global state,
-since it runs in a separate fork/process.
-
-=head2 Support for semicolon in query string
-
-  plugin CGI => {
-    support_semicolon_in_query_string => 1,
-    ...
-  };
-
-The code above need to be added before other plugins or handler which use
-L<Mojo::Message::Request/url>. It will inject a C<before_dispatch>
-hook which saves the original QUERY_STRING, before it is split on
-"&" in L<Mojo::Parameters>.
-
-=cut
-
 use Mojo::Base 'Mojolicious::Plugin';
 use Mojo::Util 'b64_decode';
 use File::Basename;
@@ -92,57 +16,8 @@ use constant WRITE                => 1;
 our $VERSION      = '0.26';
 our %ORIGINAL_ENV = %ENV;
 
-=head1 ATTRIBUTES
-
-=head2 env
-
-Holds a hash ref containing the environment variables that should be
-used when starting the CGI script. Defaults to C<%ENV> when this module
-was loaded.
-
-=head2 ioloop
-
-Holds a L<Mojo::IOLoop> object.
-
-=cut
-
 has env    => sub { +{%ORIGINAL_ENV} };
 has ioloop => sub { Mojo::IOLoop->singleton };
-
-=head1 METHODS
-
-=head2 emulate_environment
-
-  %env = $self->emulate_environment($c);
-
-Returns a hash which contains the environment variables which should be used
-by the CGI script.
-
-In addition to L</env>, these dynamic variables are set:
-
-  CONTENT_LENGTH, CONTENT_TYPE, HTTPS, PATH, PATH_INFO, QUERY_STRING,
-  REMOTE_ADDR, REMOTE_HOST, REMOTE_PORT, REMOTE_USER, REQUEST_METHOD,
-  SCRIPT_NAME, SERVER_PORT, SERVER_PROTOCOL.
-
-Additional static variables:
-
-  GATEWAY_INTERFACE = "CGI/1.1"
-  SERVER_ADMIN = $ENV{USER}
-  SCRIPT_FILENAME = Script name given as argument to register.
-  SERVER_NAME = Sys::Hostname::hostname()
-  SERVER_SOFTWARE = "Mojolicious::Plugin::CGI"
-
-Plus all headers are exposed. Examples:
-
-  .----------------------------------------.
-  | Header          | Variable             |
-  |-----------------|----------------------|
-  | Referer         | HTTP_REFERER         |
-  | User-Agent      | HTTP_USER_AGENT      |
-  | X-Forwarded-For | HTTP_X_FORWARDED_FOR |
-  '----------------------------------------'
-
-=cut
 
 sub emulate_environment {
   my ($self, $c) = @_;
@@ -191,19 +66,6 @@ sub emulate_environment {
   );
 }
 
-=head2 register
-
-  $self->register($app, [ $route => $script ]);
-  $self->register($app, %args);
-  $self->register($app, \%args);
-
-C<route> and L<path> need to exist as keys in C<%args> unless given as plain
-arguments.
-
-C<$route> can be either a plain path or a route object.
-
-=cut
-
 sub register {
   my ($self, $app, $args) = @_;
   my $pids = $app->defaults->{'mojolicious_plugin_cgi.pids'} ||= {};
@@ -231,7 +93,8 @@ sub register {
 
   $name = basename $self->{script};
   $self->{script} = File::Spec->rel2abs($self->{script}) || $self->{script};
-  $self->{route} = $app->routes->any("$self->{route}/*path_info", {path_info => ''}) unless ref $self->{route};
+  $self->{route} = $app->routes->any("$self->{route}/*path_info", {path_info => ''})
+    unless ref $self->{route};
   $self->{route}->to(
     cb => sub {
       my $c      = shift;
@@ -323,10 +186,12 @@ sub _stdout_cb {
     }
 
     $buf .= $chunk;
-    $buf =~ s/^(.*?\x0a\x0d?\x0a\x0d?)//s or return;    # false until all headers has been read from the CGI script
+    $buf =~ s/^(.*?\x0a\x0d?\x0a\x0d?)//s
+      or return;       # false until all headers has been read from the CGI script
     $headers = $1;
     if ($headers =~ /^HTTP/) {
-      $c->res->code($1) if $headers =~ m!^HTTP (\d\d\d)!;    # borked CGI response if SERVER_PROTOCOL has no version
+      $c->res->code($1)
+        if $headers =~ m!^HTTP (\d\d\d)!;    # borked CGI response if SERVER_PROTOCOL has no version
       $c->res->parse($headers);
     }
     else {
@@ -358,7 +223,8 @@ sub _waitpids {
   my $pids = shift;
 
   for my $pid (keys %$pids) {
-    local $SIG{CHLD} = 'DEFAULT';    # no idea why i need to do this, but it seems like waitpid() below return -1 if not
+    local $SIG{CHLD} = 'DEFAULT'
+      ;    # no idea why i need to do this, but it seems like waitpid() below return -1 if not
     local ($?, $!);
     next unless waitpid $pid, WNOHANG;
     my $name = delete $pids->{$pid} || 'unknown';
@@ -366,6 +232,139 @@ sub _waitpids {
     warn "[CGI:$name:$pid] Child exit_value=$exit_value ($signal)\n" if DEBUG;
   }
 }
+
+1;
+
+=encoding utf8
+
+=head1 NAME
+
+Mojolicious::Plugin::CGI - Run CGI script from Mojolicious
+
+=head1 VERSION
+
+0.26
+
+=head1 DESCRIPTION
+
+This plugin enable L<Mojolicious> to run Perl CGI scripts. It does so by forking
+a new process with a modified environment and reads the STDOUT in a non-blocking
+manner.
+
+=head1 SYNOPSIS
+
+=head2 Standard usage
+
+  use Mojolicious::Lite;
+  plugin CGI => [ "/cgi-bin/script" => "/path/to/cgi/script.pl" ];
+
+Using the code above is enough to run C<script.pl> when accessing
+L<http://localhost:3000/cgi-bin/script>.
+
+=head2 Complex usage
+
+  plugin CGI => {
+    # Specify the script and mount point
+    script => "/path/to/cgi/script.pl",
+    route  => "/some/route",
+
+    # %ENV variables visible from inside the CGI script
+    env => {}, # default is \%ENV
+
+    # Path to where STDERR from cgi script goes
+    errlog => "/path/to/file.log",
+
+    # The "before" hook is called before script start
+    # It receives a Mojolicious::Controller which can be modified
+    before => sub {
+      my $c = shift;
+      $c->req->url->query->param(a => 123);
+    },
+  };
+
+The above contains all the options you can pass on to the plugin.
+
+=head2 Running code refs
+
+  plugin CGI => {
+    route => "/some/path",
+    run   => sub {
+      my $cgi = CGI->new;
+      # ...
+    }
+  };
+
+Instead of calling a script, you can run a code block when accessing the route.
+This is (pretty much) safe, even if the code block modifies global state,
+since it runs in a separate fork/process.
+
+=head2 Support for semicolon in query string
+
+  plugin CGI => {
+    support_semicolon_in_query_string => 1,
+    ...
+  };
+
+The code above need to be added before other plugins or handler which use
+L<Mojo::Message::Request/url>. It will inject a C<before_dispatch>
+hook which saves the original QUERY_STRING, before it is split on
+"&" in L<Mojo::Parameters>.
+
+=head1 ATTRIBUTES
+
+=head2 env
+
+Holds a hash ref containing the environment variables that should be
+used when starting the CGI script. Defaults to C<%ENV> when this module
+was loaded.
+
+=head2 ioloop
+
+Holds a L<Mojo::IOLoop> object.
+
+=head1 METHODS
+
+=head2 emulate_environment
+
+  %env = $self->emulate_environment($c);
+
+Returns a hash which contains the environment variables which should be used
+by the CGI script.
+
+In addition to L</env>, these dynamic variables are set:
+
+  CONTENT_LENGTH, CONTENT_TYPE, HTTPS, PATH, PATH_INFO, QUERY_STRING,
+  REMOTE_ADDR, REMOTE_HOST, REMOTE_PORT, REMOTE_USER, REQUEST_METHOD,
+  SCRIPT_NAME, SERVER_PORT, SERVER_PROTOCOL.
+
+Additional static variables:
+
+  GATEWAY_INTERFACE = "CGI/1.1"
+  SERVER_ADMIN = $ENV{USER}
+  SCRIPT_FILENAME = Script name given as argument to register.
+  SERVER_NAME = Sys::Hostname::hostname()
+  SERVER_SOFTWARE = "Mojolicious::Plugin::CGI"
+
+Plus all headers are exposed. Examples:
+
+  .----------------------------------------.
+  | Header          | Variable             |
+  |-----------------|----------------------|
+  | Referer         | HTTP_REFERER         |
+  | User-Agent      | HTTP_USER_AGENT      |
+  | X-Forwarded-For | HTTP_X_FORWARDED_FOR |
+  '----------------------------------------'
+
+=head2 register
+
+  $self->register($app, [ $route => $script ]);
+  $self->register($app, %args);
+  $self->register($app, \%args);
+
+C<route> and L<path> need to exist as keys in C<%args> unless given as plain
+arguments.
+
+C<$route> can be either a plain path or a route object.
 
 =head1 COPYRIGHT AND LICENSE
 
@@ -379,5 +378,3 @@ the terms of the Artistic License version 2.0.
 Jan Henning Thorsen - C<jhthorsen@cpan.org>
 
 =cut
-
-1;
