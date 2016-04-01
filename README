@@ -2,7 +2,7 @@ NAME
     Mojolicious::Plugin::CGI - Run CGI script from Mojolicious
 
 VERSION
-    0.26
+    0.27
 
 DESCRIPTION
     This plugin enable Mojolicious to run Perl CGI scripts. It does so by
@@ -39,6 +39,25 @@ SYNOPSIS
 
     The above contains all the options you can pass on to the plugin.
 
+  Helper
+      plugin "CGI";
+
+      # GET /cgi-bin/some-script.cgi/path/info?x=123
+      get "/cgi-bin/#script_name/*path_info" => {path_info => ''}, sub {
+        my $c    = shift;
+        my $name = $c->stash("script_name");
+        $c->cgi->run(script => File::Spec->rel2abs("/path/to/cgi/$name"));
+      };
+
+    The helper can take most the arguments that "register" takes, with the
+    exception of "support_semicolon_in_query_string".
+
+    It is critical that "script_name" and "path_info" is present in stash.
+    If the values are extracted directly from the path or set manually does
+    not matter.
+
+    Note that the helper is registered in all of the examples.
+
   Running code refs
       plugin CGI => {
         route => "/some/path",
@@ -69,17 +88,9 @@ ATTRIBUTES
     used when starting the CGI script. Defaults to %ENV when this module was
     loaded.
 
-  ioloop
-    Holds a Mojo::IOLoop object.
-
-METHODS
-  emulate_environment
-      %env = $self->emulate_environment($c);
-
-    Returns a hash which contains the environment variables which should be
-    used by the CGI script.
-
-    In addition to "env", these dynamic variables are set:
+    This plugin will create a set of environment variables depenendent on
+    the request passed in which is according to the CGI spec. In addition to
+    "env", these dynamic variables are set:
 
       CONTENT_LENGTH, CONTENT_TYPE, HTTPS, PATH, PATH_INFO, QUERY_STRING,
       REMOTE_ADDR, REMOTE_HOST, REMOTE_PORT, REMOTE_USER, REQUEST_METHOD,

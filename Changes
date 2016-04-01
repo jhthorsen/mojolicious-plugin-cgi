@@ -1,6 +1,6 @@
 Revision history for perl distribution Mojolicious-Plugin-CGI
 
-0.27 Not Released
+0.27 2016-04-01T14:09:59+0200
  - Refactored the module
  - Add $c->cgi->run(...) helper
  - Fix bug when exec() fail in child
