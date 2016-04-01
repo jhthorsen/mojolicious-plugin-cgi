@@ -79,8 +79,8 @@ sub _emulate_environment {
   my $req            = $tx->req;
   my $headers        = $req->headers;
   my $content_length = $req->content->is_multipart ? $req->body_size : $headers->content_length;
-  my $remote_user    = '';
   my %env_headers    = (HTTP_COOKIE => '', HTTP_REFERER => '');
+  my ($remote_user, $script_name);
 
   for my $name (@{$headers->names}) {
     my $key = uc "http_$name";
@@ -96,12 +96,13 @@ sub _emulate_environment {
     $remote_user = $remote_user =~ /([^:]+)/       ? $1            : '';
   }
 
-  my $script_name
-    = $args->{route}
-    ? $c->url_for($args->{route}->name, {path_info => ''})->path->to_string
-    : $c->req->url->path->to_string;
-
-  $script_name =~ s!\Q$args->{script_name}\E.*!$args->{script_name}! if $args->{script_name};
+  if ($args->{route}) {
+    $script_name = $c->url_for($args->{route}->name, {path_info => ''})->path->to_string;
+  }
+  elsif (my $name = $c->stash('script_name')) {
+    my $name = quotemeta $name;
+    $script_name = $c->req->url->path =~ m!^(.*?/$name)! ? $1 : $c->stash('script_name');
+  }
 
   return (
     %{$args->{env} || {}},
@@ -115,10 +116,10 @@ sub _emulate_environment {
     REMOTE_ADDR => $tx->remote_address,
     REMOTE_HOST => gethostbyaddr(inet_aton($tx->remote_address || '127.0.0.1'), AF_INET) || '',
     REMOTE_PORT => $tx->remote_port,
-    REMOTE_USER => $remote_user,
+    REMOTE_USER => $remote_user || '',
     REQUEST_METHOD  => $req->method,
     SCRIPT_FILENAME => $args->{script} || '',
-    SCRIPT_NAME     => $script_name,
+    SCRIPT_NAME     => $script_name || $args->{name},
     SERVER_ADMIN    => $ENV{USER} || '',
     SERVER_NAME     => hostname,
     SERVER_PORT     => $tx->local_port,
@@ -306,17 +307,18 @@ The above contains all the options you can pass on to the plugin.
   plugin "CGI";
 
   # GET /cgi-bin/some-script.cgi/path/info?x=123
-  get "/cgi-bin/#name/*path_info" => {path_info => ''}, sub {
+  get "/cgi-bin/#script_name/*path_info" => {path_info => ''}, sub {
     my $c    = shift;
-    my $name = $c->stash("name");
-    $c->cgi->run({
-      script      => File::Spec->rel2abs("/path/to/cgi/$name"),
-      script_name => $name, # required to set correct SCRIPT_NAME
-    });
+    my $name = $c->stash("script_name");
+    $c->cgi->run(script => File::Spec->rel2abs("/path/to/cgi/$name"));
   };
 
-The helper can take most the arguments that L</register> takes, with
-the exception of C<support_semicolon_in_query_string>.
+The helper can take most the arguments that L</register> takes, with the
+exception of C<support_semicolon_in_query_string>.
+
+It is critical that "script_name" and "path_info" is present in
+L<stash|Mojolicious::Controller/stash>. If the values are extracted directly
+from the path or set manually does not matter.
 
 Note that the helper is registered in all of the examples.
 
