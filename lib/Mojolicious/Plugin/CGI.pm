@@ -15,7 +15,7 @@ use constant IS_WINDOWS           => is_os_type('Windows');
 use constant READ                 => 0;
 use constant WRITE                => 1;
 
-our $VERSION      = '0.27';
+our $VERSION      = '0.28';
 our %ORIGINAL_ENV = %ENV;
 
 has env => sub { +{%ORIGINAL_ENV} };
@@ -30,7 +30,7 @@ sub register {
 
   $app->helper('cgi.run' => sub { _run($args, @_) }) unless $app->renderer->helpers->{'cgi.run'};
   $app->{'mojolicious_plugin_cgi.tid'}
-    ||= Mojo::IOLoop->recurring(CHECK_CHILD_INTERVAL, sub { _waitpids($pids); });
+    ||= Mojo::IOLoop->recurring(CHECK_CHILD_INTERVAL, sub { local ($?, $!); _waitpids($pids); });
 
   if ($args->{support_semicolon_in_query_string}
     and !$app->{'mojolicious_plugin_cgi.before_dispatch'}++)
@@ -166,12 +166,13 @@ sub _run {
       my $GUARD = 50;
       warn "[CGI:$args->{name}:$pid] Child closed STDOUT\n" if DEBUG;
       unlink $stdin->path or die "Could not remove STDIN @{[$stdin->path]}" if -e $stdin->path;
+      local ($?, $!);
       _waitpids({$pid => $args->{pids}{$pid}})
         while $args->{pids}{$pid}
         and kill 0, $pid
         and $GUARD--;
       return $c->finish if $c->res->code;
-      return $c->render(text => "Could not run CGI script.\n", status => 500);
+      return $c->render(text => "Could not run CGI script ($?, $!).\n", status => 500);
     },
   );
 }
@@ -208,7 +209,7 @@ sub _stdout_cb {
     $headers = $1;
 
     if ($headers =~ /^HTTP/) {
-      $c->res->code($1) if $headers =~ m!^HTTP (\d\d\d)!;
+      $c->res->code($headers =~ m!^HTTP (\d\d\d)! ? $1 : 200);
       $c->res->parse($headers);
     }
     else {
@@ -243,7 +244,6 @@ sub _waitpids {
 
     # no idea why i need to do this, but it seems like waitpid() below return -1 if not
     local $SIG{CHLD} = 'DEFAULT';
-    local ($?, $!);
     next unless waitpid $pid, WNOHANG;
     my $name = delete $pids->{$pid} || 'unknown';
     my ($exit_value, $signal) = ($? >> 8, $? & 127);
@@ -261,7 +261,7 @@ Mojolicious::Plugin::CGI - Run CGI script from Mojolicious
 
 =head1 VERSION
 
-0.27
+0.28
 
 =head1 DESCRIPTION
 

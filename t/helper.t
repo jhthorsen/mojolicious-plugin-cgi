@@ -19,7 +19,7 @@ get
 
 my $t = Test::Mojo->new;
 
-$t->get_ok('/cgi-bin/nope.cgi/foo')->status_is(500)->content_is("Could not run CGI script.\n");
+$t->get_ok('/cgi-bin/nope.cgi/foo')->status_is(500)->content_like(qr{Could not run CGI script});
 
 $t->get_ok('/cgi-bin/env.cgi/some/path/info?query=123')->status_is(200)
   ->content_like(qr{^PATH_INFO=/some/path/info}m,               'PATH_INFO')
