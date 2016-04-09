@@ -1,5 +1,8 @@
 Revision history for perl distribution Mojolicious-Plugin-CGI
 
+0.29 2016-04-09T10:54:27+0200
+ - Replace "/usr/bin/perl" with "/usr/bin/env perl" in tests
+
 0.28 2016-04-06T16:22:50+0200
  - Try to fix "Could not run CGI script" test failures
 
