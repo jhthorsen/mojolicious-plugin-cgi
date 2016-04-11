@@ -1,6 +1,6 @@
 Revision history for perl distribution Mojolicious-Plugin-CGI
 
-0.31 Not Released
+0.31 2016-04-11T18:17:20+0200
  - Avoid making CPAN dist with files from t/cgi-bin
 
 0.30 2016-04-11T18:06:04+0200
