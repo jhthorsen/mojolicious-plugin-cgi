@@ -1,5 +1,8 @@
 Revision history for perl distribution Mojolicious-Plugin-CGI
 
+0.30 Not Released
+ - Will generate all the cgi-scripts with $^X
+
 0.29 2016-04-09T10:54:27+0200
  - Replace "/usr/bin/perl" with "/usr/bin/env perl" in tests
 

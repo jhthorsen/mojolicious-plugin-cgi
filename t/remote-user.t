@@ -1,14 +1,7 @@
-use warnings;
-use strict;
-use Test::More;
-use Test::Mojo;
+use t::Helper;
 
-plan skip_all => 't/cgi-bin/env.cgi' unless -x 't/cgi-bin/env.cgi';
-
-{
-  use Mojolicious::Lite;
-  plugin CGI => {route => '/auth', script => 't/cgi-bin/env.cgi', env => {}};
-}
+use Mojolicious::Lite;
+plugin CGI => {route => '/auth', script => cgi_script('env.cgi'), env => {}};
 
 my $t = Test::Mojo->new;
 
@@ -22,6 +15,5 @@ $t->get_ok(
   $t->tx->req->url->clone->userinfo('whatever:foopass'),
   {'Authorization' => 'Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=='}
 )->status_is(200)->content_like(qr{^REMOTE_USER=Aladdin$}m, 'REMOTE_USER=Aladdin');
-
 
 done_testing;

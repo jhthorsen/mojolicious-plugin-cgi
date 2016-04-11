@@ -1,25 +1,19 @@
-use warnings;
-use strict;
-use Test::More;
-use Test::Mojo;
+use t::Helper;
 
-plan skip_all => 't/cgi-bin/working.pl' unless -x 't/cgi-bin/working.pl';
 my $this_will_mess_up;
 
-{
-  use Mojolicious::Lite;
+use Mojolicious::Lite;
 
-  plugin CGI => {support_semicolon_in_query_string => 1};
+plugin CGI => {support_semicolon_in_query_string => 1};
 
-  app->hook(
-    before_dispatch => sub {
-      my $c = shift;
-      $this_will_mess_up = $c->req->url->query->param('a');
-    }
-  );
+app->hook(
+  before_dispatch => sub {
+    my $c = shift;
+    $this_will_mess_up = $c->req->url->query->param('a');
+  }
+);
 
-  plugin CGI => {route => '/env/basic', script => 't/cgi-bin/env.cgi', env => {}};
-}
+plugin CGI => {route => '/env/basic', script => cgi_script('env.cgi'), env => {}};
 
 my $t = Test::Mojo->new;
 

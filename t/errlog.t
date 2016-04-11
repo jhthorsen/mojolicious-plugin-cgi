@@ -1,44 +1,33 @@
-use warnings;
-use strict;
-use Test::More;
-use Test::Mojo;
-use Mojolicious;
-
-plan skip_all => 't/cgi-bin/errlog' unless -x 't/cgi-bin/errlog';
+use t::Helper;
 
 unlink 't/err.log';
 
-{
-  my $app = Mojolicious->new;
-  my $t   = Test::Mojo->new($app);
-  my @err;
+my $app = Mojolicious->new;
+my $t   = Test::Mojo->new($app);
+my ($s, @err);
 
-  $app->plugin(CGI => {route => '/err', script => 't/cgi-bin/errlog'});
-  $app->log->on(
-    message => sub {
-      my ($log, $level, $message) = @_;
-      push @err, $message if $level eq 'warn';
-    }
-  );
+$app->plugin(CGI => {route => '/err', script => cgi_script('errlog')});
+$app->log->on(
+  message => sub {
+    my ($log, $level, $message) = @_;
+    push @err, $message if $level eq 'warn';
+  }
+);
 
-  $t->get_ok('/err');
-  like $err[0], qr{\[CGI:errlog:\d+\] yikes! at .*errlog line 2}, 'logged stderr';
-}
+$t->get_ok('/err');
+like $err[0], qr{\[CGI:errlog:\d+\] yikes! at .*errlog line 4}, 'logged stderr';
 
-{
-  my $app = Mojolicious->new;
-  my $t   = Test::Mojo->new($app);
-  my $s;
+$app = Mojolicious->new;
+$t   = Test::Mojo->new($app);
 
-  $app->plugin(CGI => {route => '/err', script => 't/cgi-bin/errlog', errlog => 't/err.log'});
+$app->plugin(CGI => {route => '/err', script => cgi_script('errlog'), errlog => 't/err.log'});
 
-  $t->get_ok('/err');
-  $s = -s 't/err.log';
-  ok $s, 't/err.log has data';
+$t->get_ok('/err');
+$s = -s 't/err.log';
+ok $s, 't/err.log has data';
 
-  $t->get_ok('/err');
-  ok -s 't/err.log' >= $s * 2, 't/err.log has more data';
-}
+$t->get_ok('/err');
+ok -s 't/err.log' >= $s * 2, 't/err.log has more data';
 
 unlink 't/err.log';
 done_testing;

@@ -11,3 +11,4 @@
 *.swp
 ~$
 /Mojolicious-Plugin-CGI*tar.gz
+t/cgi-bin

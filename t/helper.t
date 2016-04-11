@@ -1,20 +1,15 @@
-use warnings;
-use strict;
-use Test::More;
-use Test::Mojo;
-
-plan skip_all => 't/cgi-bin/working.pl' unless -x 't/cgi-bin/working.pl';
+use t::Helper;
 
 use Mojolicious::Lite;
 plugin "CGI";
+
 get
   "/cgi-bin/#script_name/*path_info" => {path_info => ''},
   sub {
-  my $c      = shift;
-  my $name   = $c->stash("script_name");
-  my $script = File::Spec->rel2abs("t/cgi-bin/$name");
-  $script = File::Spec->rel2abs("t/cgi-bin/$name.cgi") unless -x $script;
-  $c->cgi->run(script => $script);
+  my $c           = shift;
+  my $script_name = $c->stash('script_name');
+  $script_name = "$script_name.cgi" unless $script_name =~ /\.cgi$/;
+  $c->cgi->run(script => File::Spec->rel2abs(cgi_script($script_name)));
   };
 
 my $t = Test::Mojo->new;

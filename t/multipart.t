@@ -1,27 +1,23 @@
-use warnings;
-use strict;
-use Test::More;
-use Test::Mojo;
+use t::Helper;
 
-plan skip_all => 't/cgi-bin/file_upload' unless -x 't/cgi-bin/file_upload';
-
-{
-  use Mojolicious::Lite;
-  plugin CGI => [ '/file_upload' => 't/cgi-bin/file_upload' ];
-}
+use Mojolicious::Lite;
+plugin CGI => ['/file_upload' => cgi_script('file_upload')];
 
 my $t = Test::Mojo->new;
 
 $t->post_ok(
-  '/file_upload' => form => {mytext => [
-    {file => 't/foo.txt'},
-    {file => 't/bar.txt'},
-    {file => 't/test_file_with_a_long_filename.txt'},
-  ]}
+  '/file_upload' => form => {
+    mytext => [
+      {file => 't/foo.txt'},
+      {file => 't/bar.txt'},
+      {file => 't/test_file_with_a_long_filename.txt'},
+    ]
+  }
 );
 $t->status_is(200);
 
-$t->content_like(qr{^\d+
+$t->content_like(
+  qr{^\d+
 === multipart/form-data; boundary=(\w+)
 === \d+
 --- --\1\r
@@ -42,6 +38,7 @@ $t->content_like(qr{^\d+
 --- and yet more
 --- data in here
 --- \r
---- --\1--}s);
+--- --\1--}s
+);
 
 done_testing;
