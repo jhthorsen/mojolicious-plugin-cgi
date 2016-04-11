@@ -9,3 +9,4 @@
 ^MYMETA*
 ^README.pod
 ^Mojolicious-Plugin-CGI
+cgi-bin
