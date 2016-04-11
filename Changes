@@ -1,6 +1,6 @@
 Revision history for perl distribution Mojolicious-Plugin-CGI
 
-0.30 Not Released
+0.30 2016-04-11T18:06:04+0200
  - Will generate all the cgi-scripts with $^X
 
 0.29 2016-04-09T10:54:27+0200
