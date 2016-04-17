@@ -1,8 +1,10 @@
 use t::Helper;
 
+$ENV{THE_ANSWER} = 42;
+
 use Mojolicious::Lite;
 plugin CGI => ['/working' => cgi_script('basic.pl')];
-plugin CGI => {route => '/env/basic', script => cgi_script('env.cgi'), env => {}};
+plugin CGI => {route => '/env/basic', script => cgi_script('env.cgi')};
 
 my $t = Test::Mojo->new;
 
@@ -31,7 +33,7 @@ $t->get_ok($t->tx->req->url->clone->path('/env/basic/foo')->query(query => 123))
   ->content_like(qr{^SERVER_PORT=\d+}m,            'SERVER_PORT=\d+')
   ->content_like(qr{^SERVER_PROTOCOL=HTTP}m,       'SERVER_PROTOCOL=HTTP')
   ->content_like(qr{^SERVER_SOFTWARE=Mojolicious::Plugin::CGI}m,
-  'SERVER_SOFTWARE=Mojolicious::Plugin::CGI');
+  'SERVER_SOFTWARE=Mojolicious::Plugin::CGI')->content_like(qr{^THE_ANSWER=42}m, 'THE_ANSWER=42');
 
 $t->get_ok('/env/basic/foo' => {'Referer' => 'http://thorsen.pm', 'X-Forwarded-For' => '1.2.3.4'})
   ->status_is(200)

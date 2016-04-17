@@ -25,6 +25,7 @@ sub register {
   my $pids = $app->{'mojolicious_plugin_cgi.pids'} ||= {};
 
   $args = {route => shift @$args, script => shift @$args} if ref $args eq 'ARRAY';
+  $args->{env} ||= $self->env;
   $args->{run} = delete $args->{script} if ref $args->{script} eq 'CODE';
   $args->{pids} = $pids;
 
@@ -105,7 +106,7 @@ sub _emulate_environment {
   }
 
   return (
-    %{$args->{env} || {}},
+    %{$args->{env}},
     CONTENT_LENGTH => $content_length        || 0,
     CONTENT_TYPE   => $headers->content_type || '',
     GATEWAY_INTERFACE => 'CGI/1.1',
@@ -136,7 +137,7 @@ sub _run {
   my @stdout = pipely;
   my ($pid, $log_key, @stderr);
 
-  $args->{$_} ||= $defaults->{$_} for qw(errlog route run script);
+  $args->{$_} ||= $defaults->{$_} for qw(env errlog route run script);
   $args->{name} = $args->{run} ? "$args->{run}" : basename $args->{script};
   $c->$before($args) if $before;
   @stderr = (pipely) unless $args->{errlog};
