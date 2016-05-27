@@ -172,6 +172,7 @@ sub _run {
         while $args->{pids}{$pid}
         and kill 0, $pid
         and $GUARD--;
+      $defaults->{pids}{$pid} = $args->{pids}{$pid} if kill 0, $pid;
       return $c->finish if $c->res->code;
       return $c->render(text => "Could not run CGI script ($?, $!).\n", status => 500);
     },
