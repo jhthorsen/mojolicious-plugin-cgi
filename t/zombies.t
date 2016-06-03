@@ -33,6 +33,7 @@ plugin Config => {
 
 plugin CGI => {
   route => '/',
+  script => "$script", # this is required to run the test for 0.26
   run => sub {
     print "HTTP/1.1 200 OK\r\n";
     print "Content-Type: text/text; charset=ISO-8859-1\r\n";
