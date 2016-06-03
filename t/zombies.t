@@ -9,9 +9,8 @@ use FindBin;
 use Proc::ProcessTable;
 use IO::Socket::INET;
 use Mojo::IOLoop::Server;
-use Mojo::Server::Hypnotoad;
 use Mojo::UserAgent;
-use Mojo::Util qw(slurp spurt);
+use Mojo::Util 'spurt';
 
 # Prepare script
 my $dir = tempdir CLEANUP => 1;
@@ -27,7 +26,7 @@ plugin Config => {
     hypnotoad => {
       inactivity_timeout => 3,
       listen => ['http://127.0.0.1:$port'],
-      workers => 4
+      workers => 2
     }
   }
 };
@@ -63,25 +62,24 @@ is $tx->res->code, 200, 'right status';
 is $tx->res->body, "Hello CGI!\n", 'right content';
 
 # Hammer the server
-my $requests = 1000;
+my $requests = 20;
 diag("Hammering the server with $requests requests");
-my $delay = Mojo::IOLoop->delay(
-  sub {
-    my $delay = shift;
-    for my $i (1 .. $requests) {
-      $ua->get("http://127.0.0.1:$port/" => $delay->begin);
-    };
-  },
-)->wait();
+for my $i (1 .. $requests) {
+  $ua->get("http://127.0.0.1:$port/");
+  sleep 1;
+};
 
 # See whether zombies are reaped
-my $seconds = 60;
+my $seconds = 20;
+my $ts = time;
+diag("Waiting for the reaper");
 for my $i (1 .. $seconds) {
   sleep 1;
   last if _zombies() == 0;
 }
 
-is _zombies(), 0, "No zombies left after ${seconds}s";
+my $delta = time - $ts;
+is _zombies(), 0, "No zombies left after $delta seconds";
 
 # Stop the server
 open my $stop, '-|', $^X, $hypnotoad, $script, '-s';
