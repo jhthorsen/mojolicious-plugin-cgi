@@ -6,7 +6,7 @@ use File::Spec::Functions 'catfile';
 use File::Temp 'tempdir';
 use File::Which;
 use FindBin;
-
+use Proc::ProcessTable;
 use IO::Socket::INET;
 use Mojo::IOLoop::Server;
 use Mojo::Server::Hypnotoad;
@@ -63,14 +63,25 @@ is $tx->res->code, 200, 'right status';
 is $tx->res->body, "Hello CGI!\n", 'right content';
 
 # Hammer the server
+my $requests = 1000;
+diag("Hammering the server with $requests requests");
 my $delay = Mojo::IOLoop->delay(
   sub {
     my $delay = shift;
-    for my $i (1 .. 100) {
+    for my $i (1 .. $requests) {
       $ua->get("http://127.0.0.1:$port/" => $delay->begin);
     };
-  }
+  },
 )->wait();
+
+# See whether zombies are reaped
+my $seconds = 60;
+for my $i (1 .. $seconds) {
+  sleep 1;
+  last if _zombies() == 0;
+}
+
+is _zombies(), 0, "No zombies left after ${seconds}s";
 
 # Stop the server
 open my $stop, '-|', $^X, $hypnotoad, $script, '-s';
@@ -81,5 +92,16 @@ my $alive = kill 0 => $pid;
 is $alive, 0, "$pid is terminated";
 
 sub _port { IO::Socket::INET->new(PeerAddr => '127.0.0.1', PeerPort => shift) }
+
+sub _zombies {
+  my $processes = new Proc::ProcessTable( 'enable_ttys' => 0 );
+  # say join(', ', $processes->fields);
+  my $grp = getpgrp $pid;
+  my $zombies = 0;
+  foreach my $proc (@{$processes->table}) {
+    $zombies++ if $proc->pgrp == $grp and $proc->state eq 'defunct';
+  }
+  return $zombies;
+}  
 
 done_testing();
