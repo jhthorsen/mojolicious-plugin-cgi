@@ -1,5 +1,8 @@
 Revision history for perl distribution Mojolicious-Plugin-CGI
 
+0.33 2016-06-07T15:46:09-0500
+ - Fix zombies left behind #20 #21 #22
+
 0.32 2016-04-17T14:34:17+0200
  - Fix passing on %ENV to cgi script #19
 
