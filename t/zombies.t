@@ -2,15 +2,14 @@ use Mojo::Base -strict;
 use Test::More;
 use File::Spec::Functions 'catfile';
 use File::Temp 'tempdir';
-use File::Which;
 use FindBin;
 use IO::Socket::INET;
 use Mojo::IOLoop::Server;
 use Mojo::UserAgent;
 use Mojo::Util 'spurt';
 
-plan skip_all => 'This test is a development test'
-  unless -e '.git' and eval 'require Proc::ProcessTable;1';
+plan skip_all => $@
+  unless -e '.git' and eval 'require Proc::ProcessTable && require File::Which && 1';
 
 # Prepare script
 my $dir = tempdir CLEANUP => 1;
@@ -46,7 +45,7 @@ app->start;
 EOF
 
 # Start server
-my $hypnotoad = which 'hypnotoad';
+my $hypnotoad = File::Which::which('hypnotoad');
 open my $start, '-|', $^X, $hypnotoad, $script;
 sleep 1 while !_port($port);
 

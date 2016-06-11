@@ -1,5 +1,8 @@
 Revision history for perl distribution Mojolicious-Plugin-CGI
 
+0.34 2016-06-10T19:41:37-0700
+ - zombies.t cannot run without File::Which
+
 0.33 2016-06-07T15:46:09-0500
  - Fix zombies left behind #20 #21 #22
 
