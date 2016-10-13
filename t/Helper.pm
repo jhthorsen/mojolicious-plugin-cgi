@@ -25,6 +25,8 @@ sub import {
   my $class  = shift;
   my $caller = caller;
 
+  Test::More::plan(skip_all => 'Skipping tests on Windows.') if $^O eq 'Win32';
+
   eval <<"HERE";
 package $caller;
 use Mojo::Base -strict;

@@ -1,5 +1,8 @@
 Revision history for perl distribution Mojolicious-Plugin-CGI
 
+0.35 2016-10-13T10:04:50+0200
+ - Skipping tests on Windows
+
 0.34 2016-06-10T19:41:37-0700
  - zombies.t cannot run without File::Which
 
