@@ -1,20 +1,20 @@
 package Mojolicious::Plugin::CGI;
 use Mojo::Base 'Mojolicious::Plugin';
 
-use Mojo::Util 'b64_decode';
 use File::Basename;
 use File::Spec;
-use Sys::Hostname;
 use IO::Pipely 'pipely';
+use Mojo::Util qw(b64_decode encode);
 use POSIX 'WNOHANG';
 use Perl::OSType 'is_os_type';
 use Socket qw(AF_INET inet_aton);
+use Sys::Hostname;
+
 use constant CHECK_CHILD_INTERVAL => $ENV{CHECK_CHILD_INTERVAL} || 0.01;
 use constant DEBUG                => $ENV{MOJO_PLUGIN_CGI_DEBUG};
 use constant IS_WINDOWS           => is_os_type('Windows');
 use constant READ                 => 0;
 use constant WRITE                => 1;
-use Encode qw(encode_utf8);
 
 our $VERSION      = '0.35';
 our %ORIGINAL_ENV = %ENV;
@@ -58,7 +58,6 @@ sub _child {
 
   Mojo::IOLoop->reset;
   warn "[CGI:$args->{name}:$$] <<< (@{[$stdin->slurp]})\n" if DEBUG;
-  %ENV = _emulate_environment($c, $args);
   open STDIN, '<', $stdin->path or die "STDIN @{[$stdin->path]}: $!" if -s $stdin->path;
   open STDERR, $STDERR[0], $STDERR[1] or die "STDERR: @$stderr: $!";
   open STDOUT, '>&', fileno $stdout->[WRITE] or die "STDOUT: $!";
@@ -67,6 +66,7 @@ sub _child {
   select STDOUT;
   $| = 1;
 
+  %ENV = _emulate_environment($c, $args);
   $args->{run} ? $args->{run}->($c) : exec $args->{script}
     || die "Could not execute $args->{script}: $!";
 
@@ -113,7 +113,7 @@ sub _emulate_environment {
     GATEWAY_INTERFACE => 'CGI/1.1',
     HTTPS             => $req->is_secure ? 'YES' : 'NO',
     %env_headers,
-    PATH_INFO => '/' . (encode_utf8($c->stash('path_info')) || ''),
+    PATH_INFO => '/' . encode('UTF-8', $c->stash('path_info') // ''),
     QUERY_STRING => $c->stash('cgi.query_string') || $req->url->query->to_string,
     REMOTE_ADDR => $tx->remote_address,
     REMOTE_HOST => gethostbyaddr(inet_aton($tx->remote_address || '127.0.0.1'), AF_INET) || '',
