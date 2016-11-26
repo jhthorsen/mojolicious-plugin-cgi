@@ -53,7 +53,8 @@ sub register {
 }
 
 sub _child {
-  my ($c, $args, $stdin, $stdout, $stderr) = @_;
+  my ($defaults, $c, $args, $stdin, $stdout, $stderr) = @_;
+  my $pre_exec = $args->{pre_exec} || $defaults->{pre_exec};
   my @STDERR = @$stderr ? ('>&', fileno $stderr->[WRITE]) : ('>>', $args->{errlog});
 
   Mojo::IOLoop->reset;
@@ -67,6 +68,7 @@ sub _child {
   $| = 1;
 
   %ENV = _emulate_environment($c, $args);
+  $c->$pre_exec($args) if $pre_exec;
   $args->{run} ? $args->{run}->($c) : exec $args->{script}
     || die "Could not execute $args->{script}: $!";
 
@@ -143,7 +145,7 @@ sub _run {
   $c->$before($args) if $before;
   @stderr = (pipely) unless $args->{errlog};
   defined($pid = fork) or die "[CGI:$args->{name}] fork failed: $!";
-  _child($c, $args, $stdin, \@stdout, \@stderr) unless $pid;
+  _child($defaults, $c, $args, $stdin, \@stdout, \@stderr) unless $pid;
   $args->{pids}{$pid} = $args->{name};
   $log_key = "CGI:$args->{name}:$pid";
   $c->app->log->debug("[$log_key] START @{[$args->{script} || $args->{run}]}");
@@ -301,6 +303,15 @@ L<http://localhost:3000/cgi-bin/script>.
       my $c = shift;
       $c->req->url->query->param(a => 123);
     },
+
+    # The "pre_exec" hook is called in the child just before exec
+    # The environment to be used can be accessed and edited
+    # It receives a Mojolicious::Controller which can be modified
+    before => sub {
+      my $c = shift;
+      $c->req->url->query->param(b => 456);
+      $ENV{'SPECIAL_PER_REQUEST_SETUP'} = get_special_setup($c);
+    },
   };
 
 The above contains all the options you can pass on to the plugin.
@@ -384,6 +395,9 @@ Plus all headers are exposed. Examples:
   | User-Agent      | HTTP_USER_AGENT      |
   | X-Forwarded-For | HTTP_X_FORWARDED_FOR |
   '----------------------------------------'
+
+To access or modify the environment dynamically (i.e. not fixed values)
+before the CGI script is executed use the "pre_exec" hook.
 
 =head2 register
 
