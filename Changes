@@ -1,5 +1,8 @@
 Revision history for perl distribution Mojolicious-Plugin-CGI
 
+0.37 Not Released
+ - Stop using deprecated "spurt" #26
+
 0.36 2016-10-27T11:55:46+0200
  - Fix setting $ENV{PATH_INFO} with UTF-8 characters
    Contributor: kensanata

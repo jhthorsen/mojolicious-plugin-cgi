@@ -2,7 +2,7 @@ use utf8;
 use lib '.';
 use t::Helper;
 use Mojo::UserAgent;
-use Mojo::Util qw(decode spurt);
+use Mojo::Util 'decode';
 
 {
   use Mojolicious::Lite;
