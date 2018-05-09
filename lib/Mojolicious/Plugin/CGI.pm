@@ -268,7 +268,7 @@ Mojolicious::Plugin::CGI - Run CGI script from Mojolicious
 
 =head1 DESCRIPTION
 
-This plugin enable L<Mojolicious> to run Perl CGI scripts. It does so by forking
+This plugin enables L<Mojolicious> to run Perl CGI scripts. It does so by forking
 a new process with a modified environment and reads the STDOUT in a non-blocking
 manner.
 
@@ -316,11 +316,11 @@ The above contains all the options you can pass on to the plugin.
     $c->cgi->run(script => File::Spec->rel2abs("/path/to/cgi/$name"));
   };
 
-The helper can take most the arguments that L</register> takes, with the
+The helper can take most of the arguments that L</register> takes, with the
 exception of C<support_semicolon_in_query_string>.
 
 It is critical that "script_name" and "path_info" is present in
-L<stash|Mojolicious::Controller/stash>. If the values are extracted directly
+L<stash|Mojolicious::Controller/stash>. Whether the values are extracted directly
 from the path or set manually does not matter.
 
 Note that the helper is registered in all of the examples.
@@ -346,7 +346,7 @@ since it runs in a separate fork/process.
     ...
   };
 
-The code above need to be added before other plugins or handler which use
+The code above needs to be added before other plugins or handlers which use
 L<Mojo::Message::Request/url>. It will inject a C<before_dispatch>
 hook which saves the original QUERY_STRING, before it is split on
 "&" in L<Mojo::Parameters>.
