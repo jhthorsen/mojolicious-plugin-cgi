@@ -155,16 +155,12 @@ sub _run {
     Mojo::IOLoop->stream($p->[READ]);
   }
 
-  $c->delay(
-    sub {
-      my ($delay) = @_;
-      $c->stash('cgi.pid' => $pid, 'cgi.stdin' => $stdin);
-      $stderr[READ]->on(read => _stderr_cb($c, $log_key)) if $stderr[READ];
-      $stdout[READ]->on(read => _stdout_cb($c, $log_key));
-      $stdout[READ]->on(close => $delay->begin);
-    },
-    sub {
-      my ($delay) = @_;
+  $c->stash('cgi.pid' => $pid, 'cgi.stdin' => $stdin);
+  $c->render_later;
+
+  $stderr[READ]->on(read => _stderr_cb($c, $log_key)) if $stderr[READ];
+  $stdout[READ]->on(read => _stdout_cb($c, $log_key));
+  $stdout[READ]->on(close => sub {
       my $GUARD = 50;
       warn "[CGI:$args->{name}:$pid] Child closed STDOUT\n" if DEBUG;
       unlink $stdin->path or die "Could not remove STDIN @{[$stdin->path]}" if -e $stdin->path;
@@ -176,7 +172,7 @@ sub _run {
       $defaults->{pids}{$pid} = $args->{pids}{$pid} if kill 0, $pid;
       return $c->finish if $c->res->code;
       return $c->render(text => "Could not run CGI script ($?, $!).\n", status => 500);
-    },
+    }
   );
 }
 
