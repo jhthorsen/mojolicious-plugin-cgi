@@ -16,7 +16,7 @@ use constant IS_WINDOWS           => is_os_type('Windows');
 use constant READ                 => 0;
 use constant WRITE                => 1;
 
-our $VERSION = '0.39';
+our $VERSION      = '0.40';
 our %ORIGINAL_ENV = %ENV;
 
 has env => sub { +{%ORIGINAL_ENV} };
@@ -113,12 +113,12 @@ sub _emulate_environment {
     GATEWAY_INTERFACE => 'CGI/1.1',
     HTTPS             => $req->is_secure ? 'YES' : 'NO',
     %env_headers,
-    PATH_INFO => '/' . encode('UTF-8', $c->stash('path_info') // ''),
-    QUERY_STRING => $c->stash('cgi.query_string') || $req->url->query->to_string,
-    REMOTE_ADDR => $tx->remote_address,
-    REMOTE_HOST => gethostbyaddr(inet_aton($tx->remote_address || '127.0.0.1'), AF_INET) || '',
-    REMOTE_PORT => $tx->remote_port,
-    REMOTE_USER => $remote_user || '',
+    PATH_INFO       => '/' . encode('UTF-8', $c->stash('path_info') // ''),
+    QUERY_STRING    => $c->stash('cgi.query_string') || $req->url->query->to_string,
+    REMOTE_ADDR     => $tx->remote_address,
+    REMOTE_HOST     => gethostbyaddr(inet_aton($tx->remote_address || '127.0.0.1'), AF_INET) || '',
+    REMOTE_PORT     => $tx->remote_port,
+    REMOTE_USER     => $remote_user || '',
     REQUEST_METHOD  => $req->method,
     SCRIPT_FILENAME => $args->{script} || '',
     SCRIPT_NAME     => $script_name || $args->{name},
@@ -160,7 +160,8 @@ sub _run {
 
   $stderr[READ]->on(read => _stderr_cb($c, $log_key)) if $stderr[READ];
   $stdout[READ]->on(read => _stdout_cb($c, $log_key));
-  $stdout[READ]->on(close => sub {
+  $stdout[READ]->on(
+    close => sub {
       my $GUARD = 50;
       warn "[CGI:$args->{name}:$pid] Child closed STDOUT\n" if DEBUG;
       unlink $stdin->path or die "Could not remove STDIN @{[$stdin->path]}" if -e $stdin->path;
@@ -260,7 +261,7 @@ Mojolicious::Plugin::CGI - Run CGI script from Mojolicious
 
 =head1 VERSION
 
-0.39
+0.40
 
 =head1 DESCRIPTION
 
